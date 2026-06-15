@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flake-check:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: DeterminateSystems/determinate-nix-action@v3
+      - name: Run nix flake check
+        run: nix flake check -L
