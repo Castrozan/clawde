@@ -98,8 +98,17 @@ def test_each_newly_created_agent_window_is_staggered(monkeypatch):
     )
 
 
-def test_steady_state_reconcile_does_not_stagger_existing_windows(monkeypatch):
-    _patch_no_running_wrappers(monkeypatch)
+def test_steady_state_reconcile_does_not_relaunch_running_agents(monkeypatch):
+    monkeypatch.setattr(
+        service_module.agent_wrapper_reconcile,
+        "agent_names_with_running_wrapper_after_reconcile",
+        lambda session_name, declared_agent_names: {
+            "first-agent",
+            "second-agent",
+            "third-agent",
+            "fourth-agent",
+        },
+    )
     monkeypatch.setattr(
         service_module,
         "run_tmux_command",
@@ -130,7 +139,8 @@ def test_steady_state_reconcile_does_not_stagger_existing_windows(monkeypatch):
     service_module.ensure_all_agent_windows(specification)
 
     assert stagger_sleeps == [], (
-        "a reconcile pass where every agent window already exists must not sleep"
+        "a reconcile pass where every declared agent already has a running wrapper "
+        "must not relaunch any window and so must not sleep"
     )
 
 

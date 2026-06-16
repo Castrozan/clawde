@@ -43,3 +43,28 @@ def fake_tmux_with_window_inventory(live_session_names, windows_by_session):
         return FakeCompletedProcess(0)
 
     return fake_run_tmux_command
+
+
+def recording_fake_tmux(live_session_names, windows_by_session):
+    issued_commands = []
+
+    def fake_run_tmux_command(*arguments):
+        issued_commands.append(arguments)
+        subcommand = arguments[0]
+        if subcommand == "has-session":
+            return FakeCompletedProcess(0 if arguments[2] in live_session_names else 1)
+        if subcommand == "new-session":
+            session_name = arguments[3]
+            live_session_names.add(session_name)
+            windows_by_session.setdefault(session_name, set()).add(arguments[5])
+            return FakeCompletedProcess(0)
+        if subcommand == "list-windows":
+            return FakeCompletedProcess(
+                0, stdout="\n".join(windows_by_session.get(arguments[2], set()))
+            )
+        if subcommand == "new-window":
+            windows_by_session.setdefault(arguments[2], set()).add(arguments[4])
+            return FakeCompletedProcess(0)
+        return FakeCompletedProcess(0)
+
+    return fake_run_tmux_command, issued_commands

@@ -33,7 +33,9 @@ def window_exists(session_name: str, window_name: str) -> bool:
     return window_name in result.stdout.splitlines()
 
 
-def create_session_with_placeholder_window(session_name: str) -> None:
+def create_placeholder_session_if_absent(session_name: str) -> bool:
+    if session_exists(session_name):
+        return False
     result = run_tmux_command(
         "new-session",
         "-d",
@@ -43,12 +45,15 @@ def create_session_with_placeholder_window(session_name: str) -> None:
         BOOTSTRAP_PLACEHOLDER_WINDOW_NAME,
         "sleep infinity",
     )
-    if result.returncode != 0:
-        print(
-            f"Error: failed to create tmux session {session_name!r}: {result.stderr.strip()}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    if result.returncode == 0:
+        return True
+    if session_exists(session_name):
+        return False
+    print(
+        f"Error: failed to create tmux session {session_name!r}: {result.stderr.strip()}",
+        file=sys.stderr,
+    )
+    return False
 
 
 def remove_placeholder_window(session_name: str) -> None:
@@ -61,7 +66,32 @@ def ensure_agent_window(
     session_name: str, window_name: str, wrapper_command: str
 ) -> bool:
     if window_exists(session_name, window_name):
+        return relaunch_wrapper_in_window(session_name, window_name, wrapper_command)
+    return create_agent_window(session_name, window_name, wrapper_command)
+
+
+def relaunch_wrapper_in_window(
+    session_name: str, window_name: str, wrapper_command: str
+) -> bool:
+    result = run_tmux_command(
+        "respawn-window",
+        "-k",
+        "-t",
+        f"{session_name}:{window_name}",
+        wrapper_command,
+    )
+    if result.returncode != 0:
+        print(
+            f"Error: failed to relaunch wrapper in tmux window {window_name!r}: {result.stderr.strip()}",
+            file=sys.stderr,
+        )
         return False
+    return True
+
+
+def create_agent_window(
+    session_name: str, window_name: str, wrapper_command: str
+) -> bool:
     result = run_tmux_command(
         "new-window", "-t", session_name, "-n", window_name, wrapper_command
     )
@@ -77,10 +107,7 @@ def ensure_agent_window(
 def ensure_agent_windows_for_session(session_specification: dict) -> None:
     session_name = session_specification["name"]
 
-    placeholder_created = False
-    if not session_exists(session_name):
-        create_session_with_placeholder_window(session_name)
-        placeholder_created = True
+    placeholder_created = create_placeholder_session_if_absent(session_name)
 
     declared_agent_names = {
         agent_specification["name"]
