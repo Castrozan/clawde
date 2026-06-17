@@ -68,7 +68,9 @@ def test_supervise_rereads_config_on_each_restart(monkeypatch, tmp_path):
     monkeypatch.setattr(
         wrapper, "run_launch_command_once", fake_run_launch_command_once
     )
-    monkeypatch.setattr(wrapper, "is_within_active_hours", lambda start, end: True)
+    monkeypatch.setattr(
+        wrapper, "is_within_active_hours", lambda start, end, now=None: True
+    )
     monkeypatch.setattr(wrapper, "should_rotate_session", lambda rotation, date: False)
     monkeypatch.setattr(wrapper.time, "sleep", lambda seconds: None)
 
@@ -95,7 +97,9 @@ def test_session_rotation_drops_pending_resume_so_relaunch_is_fresh(
     monkeypatch.setattr(
         wrapper, "run_launch_command_once", fake_run_launch_command_once
     )
-    monkeypatch.setattr(wrapper, "is_within_active_hours", lambda start, end: True)
+    monkeypatch.setattr(
+        wrapper, "is_within_active_hours", lambda start, end, now=None: True
+    )
     monkeypatch.setattr(wrapper, "should_rotate_session", lambda rotation, date: True)
     monkeypatch.setattr(wrapper.time, "sleep", lambda seconds: None)
 

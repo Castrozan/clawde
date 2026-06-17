@@ -1,7 +1,16 @@
 import argparse
+import datetime
 import json
 import time
 
+from active_hours_override import (
+    active_hours_gate_allows_run,
+    clear_override,
+    override_file_path_for_agent,
+    override_is_stale,
+    read_override_active_until,
+    runtime_root_directory_from_launch_config_path,
+)
 from redeploy_signals import (
     install_exit_signal_handlers,
     install_redeploy_signal_handler,
@@ -54,7 +63,22 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
         daily_session_rotation = config.get("daily_session_rotation", False)
         tmux_target = build_tmux_target(config.get("tmux_session"), agent_name)
 
-        if not is_within_active_hours(active_hours_start, active_hours_end):
+        override_file = override_file_path_for_agent(
+            runtime_root_directory_from_launch_config_path(config_file_path),
+            agent_name,
+        )
+        override_active_until = read_override_active_until(override_file)
+        now = datetime.datetime.now()
+        within_active_hours = is_within_active_hours(
+            active_hours_start, active_hours_end, now
+        )
+
+        if override_is_stale(within_active_hours, override_active_until, now):
+            clear_override(override_file)
+
+        if not active_hours_gate_allows_run(
+            within_active_hours, override_active_until, now
+        ):
             sleep_seconds = seconds_until_active_hours_start(active_hours_start)
             print(
                 f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
@@ -65,6 +89,14 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
             time.sleep(sleep_seconds)
             last_fresh_start_date = None
             continue
+
+        if not within_active_hours:
+            print(
+                f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
+                f"Agent {agent_name} active-hours override in effect until "
+                f"{override_active_until.isoformat()}. Running outside normal hours.",
+                flush=True,
+            )
 
         if should_rotate_session(daily_session_rotation, last_fresh_start_date):
             print(
@@ -88,7 +120,12 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
             register_child_pid=register_current_child_process_id,
         )
 
-        if not is_within_active_hours(active_hours_start, active_hours_end):
+        now_after_run = datetime.datetime.now()
+        if not active_hours_gate_allows_run(
+            is_within_active_hours(active_hours_start, active_hours_end, now_after_run),
+            read_override_active_until(override_file),
+            now_after_run,
+        ):
             continue
 
         if should_reset_backoff(runtime_seconds, was_stuck_kill):

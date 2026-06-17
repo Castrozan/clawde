@@ -31,6 +31,10 @@ let
     exec ${pkgs.python312}/bin/python3 ${../scripts/heartbeat}/change_gate.py "$@"
   '';
 
+  clawdeActiveNow = pkgs.writeShellScriptBin "clawde-active-now" ''
+    exec ${pkgs.python312}/bin/python3 ${../scripts/agent-wrapper}/activate_after_hours.py "$@"
+  '';
+
   clawdeGracefulRedeploy = pkgs.writeShellScriptBin "clawde-redeploy" ''
     export CLAWDE_RESUME_NUDGE_SCRIPT=${clawdeResumeNudgeScript}
     exec ${pkgs.python312}/bin/python3 ${clawdeGracefulRedeployScript} "$@"
@@ -95,6 +99,7 @@ in
       clawdeSessionStarter
       clawdeGracefulRedeploy
       clawdeHeartbeatChangeGate
+      clawdeActiveNow
     ];
 
     systemd.user.services = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
