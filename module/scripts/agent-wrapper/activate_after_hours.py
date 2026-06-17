@@ -1,6 +1,5 @@
 import argparse
 import datetime
-import json
 import os
 import signal
 import subprocess
@@ -10,27 +9,12 @@ from active_hours_override import (
     override_file_path_for_agent,
     write_override_active_until,
 )
+from clawde_runtime_layout import (
+    launch_config_path_for_agent,
+    read_active_hours_window,
+    runtime_root_directory,
+)
 from restart_scheduling import seconds_until_active_hours_start
-
-RUNTIME_ROOT_RELATIVE_TO_HOME = "clawde"
-LAUNCH_CONFIG_SUBDIRECTORY = "launch-config"
-
-
-def runtime_root_directory() -> str:
-    return os.path.join(os.path.expanduser("~"), RUNTIME_ROOT_RELATIVE_TO_HOME)
-
-
-def launch_config_path_for_agent(agent_name: str) -> str:
-    return os.path.join(
-        runtime_root_directory(),
-        LAUNCH_CONFIG_SUBDIRECTORY,
-        f"{agent_name}.json",
-    )
-
-
-def read_active_hours_start(launch_config_path: str) -> int | None:
-    with open(launch_config_path) as launch_config_file:
-        return json.load(launch_config_file).get("active_hours_start")
 
 
 def find_agent_wrapper_process_ids(agent_name: str) -> list[int]:
@@ -70,7 +54,9 @@ def clear_active_hours_override(agent_name: str) -> None:
 def set_active_hours_override(agent_name: str, now: datetime.datetime) -> None:
     launch_config_path = launch_config_path_for_agent(agent_name)
     try:
-        active_hours_start = read_active_hours_start(launch_config_path)
+        active_hours_start, _active_hours_end = read_active_hours_window(
+            launch_config_path
+        )
     except (OSError, ValueError) as launch_config_error:
         raise SystemExit(
             f"Could not read launch config for {agent_name} at "
@@ -100,7 +86,7 @@ def set_active_hours_override(agent_name: str, now: datetime.datetime) -> None:
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="clawde-active-now",
+        prog="clawde active",
         description="Temporarily override a clawde agent's active-hours gate so it runs "
         "now through the next active-hours start, then reverts to its normal window. "
         "Writes a runtime override file and restarts the agent's wrapper to apply it.",

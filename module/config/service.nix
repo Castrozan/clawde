@@ -17,6 +17,16 @@ let
   clawdeServiceScript = "${../scripts/clawde-service}/clawde-service.py";
 
   clawdeSessionStarter = pkgs.writeShellScriptBin "clawde" ''
+    case "''${1:-}" in
+      active)
+        shift
+        exec ${pkgs.python312}/bin/python3 ${../scripts/agent-wrapper}/activate_after_hours.py "$@"
+        ;;
+      list)
+        shift
+        exec ${pkgs.python312}/bin/python3 ${../scripts/agent-wrapper}/list_agents.py "$@"
+        ;;
+    esac
     export TMUX_BIN=${pkgs.tmux}/bin/tmux
     export DEFAULT_TMUX_SESSION_NAME=${lib.escapeShellArg defaultTmuxSessionName}
     export SYSTEMD_USER_SERVICE_NAME=clawde
@@ -29,10 +39,6 @@ let
 
   clawdeHeartbeatChangeGate = pkgs.writeShellScriptBin "clawde-heartbeat-change-gate" ''
     exec ${pkgs.python312}/bin/python3 ${../scripts/heartbeat}/change_gate.py "$@"
-  '';
-
-  clawdeActiveNow = pkgs.writeShellScriptBin "clawde-active-now" ''
-    exec ${pkgs.python312}/bin/python3 ${../scripts/agent-wrapper}/activate_after_hours.py "$@"
   '';
 
   clawdeGracefulRedeploy = pkgs.writeShellScriptBin "clawde-redeploy" ''
@@ -99,7 +105,6 @@ in
       clawdeSessionStarter
       clawdeGracefulRedeploy
       clawdeHeartbeatChangeGate
-      clawdeActiveNow
     ];
 
     systemd.user.services = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {

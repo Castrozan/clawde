@@ -39,12 +39,6 @@ def _write_launch_config(home_directory, agent_name, active_hours_start):
     return launch_config_path
 
 
-def test_read_active_hours_start_reads_field(tmp_path):
-    launch_config_path = tmp_path / "steward.json"
-    launch_config_path.write_text(json.dumps({"active_hours_start": 8}))
-    assert activate_after_hours.read_active_hours_start(str(launch_config_path)) == 8
-
-
 def test_find_agent_wrapper_process_ids_parses_pgrep_output(monkeypatch):
     monkeypatch.setattr(
         activate_after_hours.subprocess,
