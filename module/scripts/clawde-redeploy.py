@@ -120,9 +120,9 @@ def main() -> None:
         print("No running clawde agent wrappers matched; nothing to redeploy.")
         return
     print(
-        f"Signaling {len(agent_wrappers)} clawde agent wrapper(s) to restart on their "
-        "continued sessions (claude --continue) and resume their work, detached after "
-        "a short grace delay."
+        f"Signaling {len(agent_wrappers)} clawde agent wrapper(s) to restart and "
+        "resume each agent's own pinned session (claude --resume <session id>), "
+        "detached after a short grace delay."
     )
     sys.stdout.flush()
     detach_into_background_daemon_escaping_caller_process_tree()

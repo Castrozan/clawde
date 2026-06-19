@@ -152,15 +152,15 @@ def test_watchdog_terminates_when_heartbeat_driver_gives_up_on_repl(monkeypatch)
     assert len(terminated_process_ids) == 1
 
 
-def test_resume_continue_exposes_continue_flag_to_launch_command(tmp_path):
+def test_resume_flag_is_exposed_verbatim_to_launch_command(tmp_path):
     captured_flag = tmp_path / "flag.txt"
     session_watchdog.run_launch_command_once(
         f'printf "%s" "$CLAWDE_RESUME_FLAG" > "{captured_flag}"',
         None,
         None,
-        resume_continue=True,
+        resume_flag="--resume pinned-session-id",
     )
-    assert captured_flag.read_text() == "--continue"
+    assert captured_flag.read_text() == "--resume pinned-session-id"
 
 
 def test_default_launch_leaves_resume_flag_empty(tmp_path):

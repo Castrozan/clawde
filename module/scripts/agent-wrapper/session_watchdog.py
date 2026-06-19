@@ -61,12 +61,12 @@ def run_launch_command_once(
     launch_command: str,
     heartbeat_driver_argv: list[str] | None,
     tmux_target: str | None,
-    resume_continue: bool = False,
+    resume_flag: str = "",
     register_child_pid=None,
 ) -> tuple[float, bool]:
     start_time = time.time()
     launch_environment = dict(os.environ)
-    launch_environment["CLAWDE_RESUME_FLAG"] = "--continue" if resume_continue else ""
+    launch_environment["CLAWDE_RESUME_FLAG"] = resume_flag
     agent_process = subprocess.Popen(
         ["bash", "-c", launch_command], env=launch_environment
     )

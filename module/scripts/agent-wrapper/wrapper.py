@@ -25,6 +25,7 @@ from restart_scheduling import (
     should_reset_backoff,
     should_rotate_session,
 )
+from session_identity import resolve_resume_flag_and_session_identifier
 from session_watchdog import run_launch_command_once
 
 
@@ -42,6 +43,7 @@ def load_agent_launch_config(config_file_path: str) -> dict:
 def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
     restart_delay_seconds = INITIAL_RESTART_DELAY_SECONDS
     last_fresh_start_date: str | None = None
+    current_session_identifier: str | None = None
 
     while True:
         try:
@@ -110,13 +112,18 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
         if last_fresh_start_date is None:
             last_fresh_start_date = time.strftime("%Y-%m-%d")
 
-        resume_continue = redeploy_signal_state.resume_requested
+        resume_requested = redeploy_signal_state.resume_requested
         redeploy_signal_state.resume_requested = False
+        resume_flag, current_session_identifier = (
+            resolve_resume_flag_and_session_identifier(
+                resume_requested, current_session_identifier
+            )
+        )
         runtime_seconds, was_stuck_kill = run_launch_command_once(
             launch_command,
             heartbeat_driver_argv,
             tmux_target,
-            resume_continue=resume_continue,
+            resume_flag=resume_flag,
             register_child_pid=register_current_child_process_id,
         )
 
