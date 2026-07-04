@@ -125,6 +125,7 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
             tmux_target,
             resume_flag=resume_flag,
             register_child_pid=register_current_child_process_id,
+            daily_session_rotation=daily_session_rotation,
         )
 
         now_after_run = datetime.datetime.now()

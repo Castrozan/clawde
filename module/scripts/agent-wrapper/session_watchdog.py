@@ -3,6 +3,7 @@ import signal
 import subprocess
 import time
 
+from restart_scheduling import should_rotate_session
 from stuck_indicators import pane_poll_is_stuck_evidence
 
 WATCHDOG_POLL_INTERVAL_SECONDS = 30
@@ -63,8 +64,10 @@ def run_launch_command_once(
     tmux_target: str | None,
     resume_flag: str = "",
     register_child_pid=None,
+    daily_session_rotation: bool = False,
 ) -> tuple[float, bool]:
     start_time = time.time()
+    session_start_date = time.strftime("%Y-%m-%d")
     launch_environment = dict(os.environ)
     launch_environment["CLAWDE_RESUME_FLAG"] = resume_flag
     agent_process = subprocess.Popen(
@@ -84,6 +87,18 @@ def run_launch_command_once(
                 agent_process.wait(timeout=WATCHDOG_POLL_INTERVAL_SECONDS)
                 break
             except subprocess.TimeoutExpired:
+                if should_rotate_session(daily_session_rotation, session_start_date):
+                    print(
+                        f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
+                        f"Daily session rotation boundary crossed since the session "
+                        f"started on {session_start_date}. Terminating the session so "
+                        f"the supervisor loop relaunches it fresh and releases the "
+                        f"context memory accumulated over the day.",
+                        flush=True,
+                    )
+                    terminate_process_tree(agent_process.pid)
+                    agent_process.wait()
+                    break
                 if heartbeat_driver_has_given_up(driver_process):
                     print(
                         f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
