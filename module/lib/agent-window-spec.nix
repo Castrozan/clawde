@@ -43,8 +43,11 @@ let
       permissionModeFlag = "--permission-mode ${agent.permissionMode}";
       skillDirFlags = lib.concatMapStringsSep " " (dir: "--add-dir ${dir}") agent.skillDirectories;
       appendSystemPromptFlag = "--append-system-prompt \"$(cat ${agentInstructionsFile name})\"";
+      mcpConfigFlag = lib.optionalString (
+        agent.mcpConfigFile != null
+      ) "--strict-mcp-config --mcp-config ${agent.mcpConfigFile} ";
     in
-    "cd ${workspace} && ${environmentSetter}${claudeResolvedFromAgentRuntimePathForRebuildStability} \${CLAWDE_RESUME_FLAG:-} ${channelFlag} ${modelFlag} ${nameFlag} ${permissionModeFlag} ${appendSystemPromptFlag} ${skillDirFlags}";
+    "cd ${workspace} && ${environmentSetter}${claudeResolvedFromAgentRuntimePathForRebuildStability} \${CLAWDE_RESUME_FLAG:-} ${channelFlag} ${modelFlag} ${nameFlag} ${permissionModeFlag} ${mcpConfigFlag}${appendSystemPromptFlag} ${skillDirFlags}";
 
   buildHeartbeatDriverArgv =
     name: agent:

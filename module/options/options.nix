@@ -32,6 +32,11 @@
             default = [ ];
             description = "Tool patterns written into the agent workspace .claude/settings.json under permissions.deny. Composed additively with the agent type's default deny patterns.";
           };
+          mcpConfigFile = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "Absolute path to an MCP config JSON in the { mcpServers = { ... }; } shape. When set, the agent launches with --strict-mcp-config --mcp-config <path>, so only these servers spawn and the user-scoped ~/.claude.json mcpServers are ignored for this agent. Null inherits the global MCP set, spawning every user-scoped server in this agent's session.";
+          };
           permissionMode = lib.mkOption {
             type = lib.types.nullOr (
               lib.types.enum [
