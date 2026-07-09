@@ -63,7 +63,12 @@ def test_create_agent_window_makes_labeled_tab_then_runs_wrapper():
     backend.run_herdr_command = fake_run
     assert backend.create_agent_window("clawde", "bronze", "exec /nix/store/x-agent")
     assert issued[0] == ("tab", "create", "--label", "bronze", "--no-focus")
-    assert issued[1] == ("pane", "run", "wP:p9", "exec /nix/store/x-agent")
+    assert issued[1] == (
+        "pane",
+        "run",
+        "wP:p9",
+        "CLAWDE_MULTIPLEXER=herdr exec /nix/store/x-agent",
+    )
 
 
 def test_relaunch_runs_wrapper_in_existing_tab_pane():
@@ -82,7 +87,12 @@ def test_relaunch_runs_wrapper_in_existing_tab_pane():
     assert backend.relaunch_wrapper_in_window(
         "clawde", "bronze", "exec /nix/store/x-agent"
     )
-    assert ("pane", "run", "wP:p7", "exec /nix/store/x-agent") in issued
+    assert (
+        "pane",
+        "run",
+        "wP:p7",
+        "CLAWDE_MULTIPLEXER=herdr exec /nix/store/x-agent",
+    ) in issued
 
 
 def test_ensure_host_ready_is_a_noop_when_server_already_running():

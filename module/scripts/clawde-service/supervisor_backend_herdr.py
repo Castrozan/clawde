@@ -3,10 +3,14 @@ import subprocess
 import sys
 import time
 
-from supervisor_backend_base import SupervisorMultiplexerBackend
+from supervisor_backend_base import (
+    MULTIPLEXER_ENVIRONMENT_VARIABLE,
+    SupervisorMultiplexerBackend,
+)
 
 HERDR_SERVER_STARTUP_WAIT_ATTEMPTS = 30
 HERDR_SERVER_STARTUP_WAIT_DELAY_SECONDS = 0.5
+HERDR_MULTIPLEXER_ENVIRONMENT_VALUE = "herdr"
 
 
 class HerdrSupervisorBackend(SupervisorMultiplexerBackend):
@@ -94,7 +98,13 @@ class HerdrSupervisorBackend(SupervisorMultiplexerBackend):
         return self.find_agent_tab(agent_name) is not None
 
     def run_wrapper_in_pane(self, pane_id: str, wrapper_command: str) -> bool:
-        result = self.run_herdr_command("pane", "run", pane_id, wrapper_command)
+        wrapper_command_with_multiplexer_environment = (
+            f"{MULTIPLEXER_ENVIRONMENT_VARIABLE}="
+            f"{HERDR_MULTIPLEXER_ENVIRONMENT_VALUE} {wrapper_command}"
+        )
+        result = self.run_herdr_command(
+            "pane", "run", pane_id, wrapper_command_with_multiplexer_environment
+        )
         if result.returncode != 0:
             print(
                 f"Error: failed to run wrapper in herdr pane {pane_id!r}: "
