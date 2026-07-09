@@ -26,7 +26,10 @@ from restart_scheduling import (
     should_rotate_session,
 )
 from session_identity import resolve_resume_flag_and_session_identifier
-from session_watchdog import run_launch_command_once
+from session_watchdog import (
+    heartbeat_driver_log_path_for_agent,
+    run_launch_command_once,
+)
 
 
 def build_tmux_target(tmux_session: str | None, agent_name: str) -> str | None:
@@ -65,8 +68,15 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
         daily_session_rotation = config.get("daily_session_rotation", False)
         tmux_target = build_tmux_target(config.get("tmux_session"), agent_name)
 
+        runtime_root_directory = runtime_root_directory_from_launch_config_path(
+            config_file_path
+        )
         override_file = override_file_path_for_agent(
-            runtime_root_directory_from_launch_config_path(config_file_path),
+            runtime_root_directory,
+            agent_name,
+        )
+        heartbeat_driver_log_path = heartbeat_driver_log_path_for_agent(
+            runtime_root_directory,
             agent_name,
         )
         override_active_until = read_override_active_until(override_file)
@@ -126,6 +136,7 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
             resume_flag=resume_flag,
             register_child_pid=register_current_child_process_id,
             daily_session_rotation=daily_session_rotation,
+            heartbeat_driver_log_path=heartbeat_driver_log_path,
         )
 
         now_after_run = datetime.datetime.now()

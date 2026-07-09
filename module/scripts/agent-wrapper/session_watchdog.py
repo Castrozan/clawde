@@ -9,6 +9,24 @@ from stuck_indicators import pane_poll_is_stuck_evidence
 WATCHDOG_POLL_INTERVAL_SECONDS = 30
 WATCHDOG_CONSECUTIVE_STUCK_THRESHOLD = 2
 PANE_CAPTURE_LINE_COUNT = 80
+HEARTBEAT_DRIVER_LOG_SUBDIRECTORY = "heartbeat-driver-logs"
+
+
+def heartbeat_driver_log_path_for_agent(
+    runtime_root_directory: str, agent_name: str
+) -> str:
+    return os.path.join(
+        runtime_root_directory,
+        HEARTBEAT_DRIVER_LOG_SUBDIRECTORY,
+        f"{agent_name}.log",
+    )
+
+
+def open_heartbeat_driver_log_sink(heartbeat_driver_log_path: str | None):
+    if heartbeat_driver_log_path is None:
+        return subprocess.DEVNULL
+    os.makedirs(os.path.dirname(heartbeat_driver_log_path), exist_ok=True)
+    return open(heartbeat_driver_log_path, "a")
 
 
 def capture_pane_content(tmux_target: str) -> str | None:
@@ -65,6 +83,7 @@ def run_launch_command_once(
     resume_flag: str = "",
     register_child_pid=None,
     daily_session_rotation: bool = False,
+    heartbeat_driver_log_path: str | None = None,
 ) -> tuple[float, bool]:
     start_time = time.time()
     session_start_date = time.strftime("%Y-%m-%d")
@@ -75,9 +94,17 @@ def run_launch_command_once(
     )
     if register_child_pid is not None:
         register_child_pid(agent_process.pid)
-    driver_process = (
-        subprocess.Popen(heartbeat_driver_argv) if heartbeat_driver_argv else None
-    )
+    driver_process = None
+    if heartbeat_driver_argv:
+        driver_log_sink = open_heartbeat_driver_log_sink(heartbeat_driver_log_path)
+        driver_process = subprocess.Popen(
+            heartbeat_driver_argv,
+            stdin=subprocess.DEVNULL,
+            stdout=driver_log_sink,
+            stderr=subprocess.STDOUT,
+        )
+        if hasattr(driver_log_sink, "close"):
+            driver_log_sink.close()
     consecutive_stuck_polls = 0
     previous_pane_content: str | None = None
     was_stuck_kill = False
