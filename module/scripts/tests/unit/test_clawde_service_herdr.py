@@ -88,7 +88,7 @@ def test_relaunch_runs_wrapper_in_existing_tab_pane():
 def test_ensure_host_ready_is_a_noop_when_server_already_running():
     backend = herdr_backend.HerdrSupervisorBackend()
     backend.run_herdr_command = lambda *arguments: _CompletedProcessStub(
-        0, '{"result":{"sessions":[{"running":true}]}}'
+        0, '{"sessions":[{"default":true,"name":"default","running":true}]}'
     )
     assert backend.ensure_host_ready("clawde") is False
 

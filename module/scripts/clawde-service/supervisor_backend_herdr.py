@@ -32,8 +32,7 @@ class HerdrSupervisorBackend(SupervisorMultiplexerBackend):
         if session_list is None:
             return False
         return any(
-            session.get("running")
-            for session in session_list.get("result", {}).get("sessions", [])
+            session.get("running") for session in session_list.get("sessions", [])
         )
 
     def start_headless_herdr_server(self) -> None:
