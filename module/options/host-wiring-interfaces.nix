@@ -24,5 +24,14 @@
       default = null;
       description = "The claude-code package whose executable agents launch via lib.getExe. Injected by the consuming configuration; the clawde module does not pin claude-code itself.";
     };
+
+    multiplexer = lib.mkOption {
+      type = lib.types.enum [
+        "tmux"
+        "herdr"
+      ];
+      default = "tmux";
+      description = "Terminal multiplexer backend that hosts agent sessions and panes. 'tmux' is the battle-tested default whose server survives rebuilds and reboots. 'herdr' drives agents through herdr's socket API (pane read/send-keys/run, session/tab, native agent-state waits) and is opt-in until its restart-survival is proven on the fleet. The supervisor, agent wrapper, heartbeat driver, and a2a peer backend all dispatch on this value.";
+    };
   };
 }

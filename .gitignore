@@ -4,3 +4,5 @@ __pycache__/
 result
 result-*
 .direnv/
+.deep-work/
+HEARTBEAT.md
