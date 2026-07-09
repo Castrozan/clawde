@@ -3,23 +3,12 @@ import subprocess
 import sys
 import time
 
-from tmux import (
-    capture_recent_pane,
-    find_tmux_socket,
-    pane_indicates_resume_confirmation_modal,
-    pane_is_at_claude_repl_prompt,
-    send_prompt_via_tmux_buffer,
-    send_single_key_to_pane,
-    wait_for_claude_prompt,
-)
+from multiplexer import select_heartbeat_backend
 
 AGENT_WRAPPER_COMMAND_FRAGMENT = "agent-wrapper/wrapper.py --agent-name"
 LIVE_CLAUDE_PROCESS_NAME_FRAGMENT = "claude"
 LIVE_CLAUDE_WAIT_MAX_ATTEMPTS = 20
 LIVE_CLAUDE_WAIT_DELAY_SECONDS = 2
-RESUME_MODAL_DISMISS_MAX_ATTEMPTS = 15
-RESUME_MODAL_DISMISS_DELAY_SECONDS = 2
-RESUME_MODAL_SUMMARY_RESUME_KEY = "Enter"
 
 RESUME_NUDGE_PROMPT = (
     "<resume>\n"
@@ -40,8 +29,10 @@ def parse_arguments() -> argparse.Namespace:
         "back and inject a one-shot prompt so the resumed agent continues its "
         "in-flight work instead of idling at the prompt.",
     )
-    parser.add_argument("--session", required=True, help="tmux session name")
-    parser.add_argument("--window", required=True, help="tmux window name (agent name)")
+    parser.add_argument("--session", required=True, help="multiplexer session name")
+    parser.add_argument(
+        "--window", required=True, help="multiplexer window/tab name (agent name)"
+    )
     return parser.parse_args()
 
 
@@ -85,50 +76,38 @@ def wait_for_live_claude_repl(agent_name: str) -> bool:
     return False
 
 
-def dismiss_resume_confirmation_modal_if_present(tmux_socket: str, target: str) -> None:
-    for _ in range(RESUME_MODAL_DISMISS_MAX_ATTEMPTS):
-        pane_content = capture_recent_pane(tmux_socket, target)
-        if pane_content is None:
-            time.sleep(RESUME_MODAL_DISMISS_DELAY_SECONDS)
-            continue
-        if pane_is_at_claude_repl_prompt(pane_content):
-            return
-        if pane_indicates_resume_confirmation_modal(pane_content):
-            send_single_key_to_pane(
-                tmux_socket, target, RESUME_MODAL_SUMMARY_RESUME_KEY
-            )
-            return
-        time.sleep(RESUME_MODAL_DISMISS_DELAY_SECONDS)
-
-
 def main() -> None:
     arguments = parse_arguments()
-    target = f"{arguments.session}:{arguments.window}"
+    target_description = f"{arguments.session}:{arguments.window}"
 
     if not wait_for_live_claude_repl(arguments.window):
         print(
-            f"Agent {target} has no live claude REPL (dormant or outside active "
-            "hours); skipping resume nudge.",
+            f"Agent {target_description} has no live claude REPL (dormant or outside "
+            "active hours); skipping resume nudge.",
             file=sys.stderr,
         )
         return
 
-    tmux_socket = find_tmux_socket()
-    if not tmux_socket:
-        print("Error: no tmux socket found", file=sys.stderr)
-        sys.exit(1)
-
-    dismiss_resume_confirmation_modal_if_present(tmux_socket, target)
-
-    if not wait_for_claude_prompt(tmux_socket, target):
+    backend = select_heartbeat_backend()
+    pane_handle = backend.prepare_pane_handle(arguments.session, arguments.window)
+    if pane_handle is None:
         print(
-            f"Error: claude REPL prompt not detected for {target} after waiting; "
-            "not injecting resume nudge.",
+            f"Error: could not resolve agent pane for {target_description}",
             file=sys.stderr,
         )
         sys.exit(1)
 
-    send_prompt_via_tmux_buffer(tmux_socket, target, RESUME_NUDGE_PROMPT)
+    backend.dismiss_resume_confirmation_modal_if_present(pane_handle)
+
+    if not backend.wait_for_claude_prompt(pane_handle):
+        print(
+            f"Error: claude REPL prompt not detected for {target_description} after "
+            "waiting; not injecting resume nudge.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    backend.send_prompt_to_pane(pane_handle, RESUME_NUDGE_PROMPT)
 
 
 if __name__ == "__main__":

@@ -5,12 +5,8 @@ import sys
 import time
 
 from cron import cron_expression_matches, seconds_until_next_minute_boundary
-from tmux import (
-    find_tmux_socket,
-    pane_is_idle,
-    send_prompt_via_tmux_buffer,
-    wait_for_claude_prompt,
-)
+from multiplexer import select_heartbeat_backend
+from pane_content import HeartbeatMultiplexerBackend
 
 GATE_TIMEOUT_SECONDS = 120
 
@@ -31,8 +27,8 @@ def gate_allows_wake(gate_command: str | None) -> bool:
 
 
 def drive_heartbeat(
-    tmux_socket: str,
-    target: str,
+    backend: HeartbeatMultiplexerBackend,
+    pane_handle,
     cron_expression: str,
     prompt: str,
     gate_command: str | None,
@@ -42,11 +38,11 @@ def drive_heartbeat(
         now = datetime.datetime.now()
         if not cron_expression_matches(cron_expression, now):
             continue
-        if not pane_is_idle(tmux_socket, target):
+        if not backend.pane_is_idle(pane_handle):
             continue
         if not gate_allows_wake(gate_command):
             continue
-        send_prompt_via_tmux_buffer(tmux_socket, target, prompt)
+        backend.send_prompt_to_pane(pane_handle, prompt)
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -56,8 +52,10 @@ def parse_arguments() -> argparse.Namespace:
         "cron-matched minute run an optional deterministic gate and paste the "
         "heartbeat prompt into the agent pane only when the gate allows it.",
     )
-    parser.add_argument("--session", required=True, help="tmux session name")
-    parser.add_argument("--window", required=True, help="tmux window name (agent name)")
+    parser.add_argument("--session", required=True, help="multiplexer session name")
+    parser.add_argument(
+        "--window", required=True, help="multiplexer window/tab name (agent name)"
+    )
     parser.add_argument(
         "--interval", required=True, help="Cron expression for heartbeat interval"
     )
@@ -75,14 +73,13 @@ def parse_arguments() -> argparse.Namespace:
 def main() -> None:
     args = parse_arguments()
 
-    tmux_socket = find_tmux_socket()
-    if not tmux_socket:
-        print("Error: no tmux socket found", file=sys.stderr)
+    backend = select_heartbeat_backend()
+    pane_handle = backend.prepare_pane_handle(args.session, args.window)
+    if pane_handle is None:
+        print("Error: could not resolve agent pane", file=sys.stderr)
         sys.exit(1)
 
-    target = f"{args.session}:{args.window}"
-
-    if not wait_for_claude_prompt(tmux_socket, target):
+    if not backend.wait_for_claude_prompt(pane_handle):
         print(
             "Error: claude REPL prompt not detected after waiting. "
             "Agent may be stuck at onboarding. Not driving heartbeat.",
@@ -90,7 +87,7 @@ def main() -> None:
         )
         sys.exit(1)
 
-    drive_heartbeat(tmux_socket, target, args.interval, args.prompt, args.gate_command)
+    drive_heartbeat(backend, pane_handle, args.interval, args.prompt, args.gate_command)
 
 
 if __name__ == "__main__":

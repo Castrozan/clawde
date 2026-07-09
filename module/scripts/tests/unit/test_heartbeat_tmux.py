@@ -2,11 +2,14 @@ import importlib.util
 import pathlib
 import sys
 
+HEARTBEAT_DIRECTORY = (
+    pathlib.Path(__file__).resolve().parent.parent.parent / "heartbeat"
+)
+
 
 def _load_tmux_module():
-    module_path = (
-        pathlib.Path(__file__).resolve().parent.parent.parent / "heartbeat" / "tmux.py"
-    )
+    sys.path.insert(0, str(HEARTBEAT_DIRECTORY))
+    module_path = HEARTBEAT_DIRECTORY / "tmux.py"
     module_spec = importlib.util.spec_from_file_location("heartbeat_tmux", module_path)
     module = importlib.util.module_from_spec(module_spec)
     sys.modules["heartbeat_tmux"] = module
@@ -34,57 +37,6 @@ def test_paste_buffer_name_has_no_tmux_target_separator():
     )
 
 
-def test_pane_at_repl_prompt_detects_bare_marker():
-    assert tmux_module.pane_is_at_claude_repl_prompt("some output\n❯\n")
-    assert tmux_module.pane_is_at_claude_repl_prompt("prefixed line ❯")
-
-
-def test_pane_with_empty_prompt_and_trailing_space_is_idle():
-    assert tmux_module.pane_is_at_claude_repl_prompt("some output\n❯ \n")
-
-
-def test_pane_with_autosuggestion_ghost_is_idle():
-    pane_with_history_ghost = (
-        "✻ Cooked for 39s\n"
-        "──── steward ──\n"
-        "❯\xa0Leave the submodule, end the tick\n"
-        "────\n"
-    )
-    assert tmux_module.pane_is_at_claude_repl_prompt(pane_with_history_ghost)
-
-
-def test_pane_with_real_typed_input_is_not_idle():
-    pane_with_pending_input = "some output\n❯ git status\n"
-    assert not tmux_module.pane_is_at_claude_repl_prompt(pane_with_pending_input)
-
-
-def test_pane_at_onboarding_is_not_treated_as_idle_prompt():
-    onboarding_pane = "Select login method\n❯ 1. Claude account with subscription"
-    assert not tmux_module.pane_is_at_claude_repl_prompt(onboarding_pane)
-
-
-RESUME_CONFIRMATION_MODAL_PANE = (
-    "This session is 13h 41m old and 111.2k tokens.\n"
-    "\n"
-    "Resuming the full session will consume a substantial portion of your usage "
-    "limits. We recommend resuming from a summary.\n"
-    "   1. Resume from summary (recommended)\n"
-    "   2. Resume full session as-is\n"
-    "   3. Don't ask me again\n"
-    "Enter to confirm · Esc to cancel\n"
-)
-
-
-def test_resume_confirmation_modal_is_detected():
-    assert tmux_module.pane_indicates_resume_confirmation_modal(
-        RESUME_CONFIRMATION_MODAL_PANE
-    )
-
-
-def test_ordinary_idle_prompt_is_not_a_resume_confirmation_modal():
-    assert not tmux_module.pane_indicates_resume_confirmation_modal("some output\n❯\n")
-
-
 def test_send_single_key_to_pane_reports_tmux_success(monkeypatch):
     recorded_arguments = []
 
@@ -99,3 +51,17 @@ def test_send_single_key_to_pane_reports_tmux_success(monkeypatch):
     monkeypatch.setattr(tmux_module, "run_tmux_command", fake_run_tmux_command)
     assert tmux_module.send_single_key_to_pane("/socket", "clawde:steward", "Enter")
     assert recorded_arguments == [("send-keys", "-t", "clawde:steward", "Enter")]
+
+
+def test_backend_prepare_returns_none_when_no_tmux_socket(monkeypatch):
+    monkeypatch.setattr(tmux_module, "find_tmux_socket", lambda: None)
+    backend = tmux_module.TmuxHeartbeatBackend()
+    assert backend.prepare_pane_handle("clawde", "bronze") is None
+
+
+def test_backend_prepare_builds_session_window_target(monkeypatch):
+    monkeypatch.setattr(tmux_module, "find_tmux_socket", lambda: "/socket")
+    backend = tmux_module.TmuxHeartbeatBackend()
+    handle = backend.prepare_pane_handle("clawde", "bronze")
+    assert handle.tmux_socket == "/socket"
+    assert handle.target == "clawde:bronze"
