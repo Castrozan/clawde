@@ -2,18 +2,33 @@ import importlib.util
 import pathlib
 import sys
 
+SERVICE_DIRECTORY = (
+    pathlib.Path(__file__).resolve().parent.parent.parent / "clawde-service"
+)
+
+
+def _ensure_service_directory_on_path():
+    if str(SERVICE_DIRECTORY) not in sys.path:
+        sys.path.insert(0, str(SERVICE_DIRECTORY))
+
 
 def load_service_module():
-    service_directory = (
-        pathlib.Path(__file__).resolve().parent.parent.parent / "clawde-service"
-    )
-    sys.path.insert(0, str(service_directory))
-    module_path = service_directory / "clawde-service.py"
+    _ensure_service_directory_on_path()
+    module_path = SERVICE_DIRECTORY / "clawde-service.py"
     module_spec = importlib.util.spec_from_file_location("clawde_service", module_path)
     module = importlib.util.module_from_spec(module_spec)
     sys.modules["clawde_service"] = module
     module_spec.loader.exec_module(module)
     return module
+
+
+def make_tmux_supervisor_backend(fake_run_tmux_command):
+    _ensure_service_directory_on_path()
+    import supervisor_backend_tmux
+
+    backend = supervisor_backend_tmux.TmuxSupervisorBackend()
+    backend.run_tmux_command = fake_run_tmux_command
+    return backend
 
 
 class FakeCompletedProcess:

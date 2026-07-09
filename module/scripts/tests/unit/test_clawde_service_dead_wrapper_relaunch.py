@@ -1,5 +1,6 @@
 from clawde_service_test_helpers import (
     load_service_module,
+    make_tmux_supervisor_backend,
     recording_fake_tmux,
 )
 
@@ -34,10 +35,10 @@ def test_relaunches_wrapper_into_existing_window_whose_wrapper_died(monkeypatch)
     fake_run_tmux_command, issued_commands = recording_fake_tmux(
         {"clawde"}, {"clawde": {"betha-pm"}}
     )
-    monkeypatch.setattr(service_module, "run_tmux_command", fake_run_tmux_command)
+    backend = make_tmux_supervisor_backend(fake_run_tmux_command)
     monkeypatch.setattr(service_module.time, "sleep", lambda _seconds: None)
 
-    service_module.ensure_all_agent_windows(_single_agent_specification())
+    service_module.ensure_all_agent_windows(backend, _single_agent_specification())
 
     respawn_commands = [
         command for command in issued_commands if command[0] == "respawn-window"
@@ -61,10 +62,10 @@ def test_creates_window_when_the_agent_window_is_absent(monkeypatch):
     fake_run_tmux_command, issued_commands = recording_fake_tmux(
         {"clawde"}, {"clawde": set()}
     )
-    monkeypatch.setattr(service_module, "run_tmux_command", fake_run_tmux_command)
+    backend = make_tmux_supervisor_backend(fake_run_tmux_command)
     monkeypatch.setattr(service_module.time, "sleep", lambda _seconds: None)
 
-    service_module.ensure_all_agent_windows(_single_agent_specification())
+    service_module.ensure_all_agent_windows(backend, _single_agent_specification())
 
     assert [command for command in issued_commands if command[0] == "new-window"] == [
         ("new-window", "-t", "clawde", "-n", "betha-pm", WRAPPER_COMMAND)
@@ -79,10 +80,10 @@ def test_does_not_touch_a_window_whose_wrapper_is_already_running(monkeypatch):
     fake_run_tmux_command, issued_commands = recording_fake_tmux(
         {"clawde"}, {"clawde": {"betha-pm"}}
     )
-    monkeypatch.setattr(service_module, "run_tmux_command", fake_run_tmux_command)
+    backend = make_tmux_supervisor_backend(fake_run_tmux_command)
     monkeypatch.setattr(service_module.time, "sleep", lambda _seconds: None)
 
-    service_module.ensure_all_agent_windows(_single_agent_specification())
+    service_module.ensure_all_agent_windows(backend, _single_agent_specification())
 
     assert not [
         command
@@ -99,13 +100,13 @@ def test_relaunch_is_staggered_like_a_fresh_window(monkeypatch):
     fake_run_tmux_command, _issued_commands = recording_fake_tmux(
         {"clawde"}, {"clawde": {"betha-pm"}}
     )
-    monkeypatch.setattr(service_module, "run_tmux_command", fake_run_tmux_command)
+    backend = make_tmux_supervisor_backend(fake_run_tmux_command)
     stagger_sleeps = []
     monkeypatch.setattr(
         service_module.time, "sleep", lambda seconds: stagger_sleeps.append(seconds)
     )
 
-    service_module.ensure_all_agent_windows(_single_agent_specification())
+    service_module.ensure_all_agent_windows(backend, _single_agent_specification())
 
     assert stagger_sleeps == [service_module.AGENT_STARTUP_STAGGER_SECONDS], (
         "a respawned wrapper launches the same shared Discord plugin server as a fresh "

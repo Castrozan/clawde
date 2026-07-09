@@ -1,4 +1,8 @@
-from clawde_service_test_helpers import FakeCompletedProcess, load_service_module
+from clawde_service_test_helpers import (
+    FakeCompletedProcess,
+    load_service_module,
+    make_tmux_supervisor_backend,
+)
 
 service_module = load_service_module()
 
@@ -18,7 +22,7 @@ def _record_reconcile_effects(monkeypatch, list_windows_stdout, running_wrappers
             return FakeCompletedProcess(0)
         return FakeCompletedProcess(0)
 
-    monkeypatch.setattr(service_module, "run_tmux_command", fake_run_tmux_command)
+    backend = make_tmux_supervisor_backend(fake_run_tmux_command)
     monkeypatch.setattr(service_module.time, "sleep", lambda _seconds: None)
     monkeypatch.setattr(
         service_module.agent_wrapper_reconcile,
@@ -40,7 +44,7 @@ def _record_reconcile_effects(monkeypatch, list_windows_stdout, running_wrappers
         "rename_window",
         lambda _window_id, _window_name: None,
     )
-    return issued_new_windows, terminated_process_ids
+    return backend, issued_new_windows, terminated_process_ids
 
 
 def _single_session_specification(agent_names):
@@ -57,14 +61,14 @@ def _single_session_specification(agent_names):
 
 
 def test_skips_creation_when_wrapper_already_runs_in_a_renamed_window(monkeypatch):
-    issued_new_windows, terminated_process_ids = _record_reconcile_effects(
+    backend, issued_new_windows, terminated_process_ids = _record_reconcile_effects(
         monkeypatch,
         list_windows_stdout="alpha-pm\nbronze\nsilver\n",
         running_wrappers=[{"process_id": 4056, "agent_name": "steward"}],
     )
 
     service_module.ensure_all_agent_windows(
-        _single_session_specification(["alpha-pm", "bronze", "steward"])
+        backend, _single_session_specification(["alpha-pm", "bronze", "steward"])
     )
 
     assert "steward" not in issued_new_windows, (
@@ -77,7 +81,7 @@ def test_skips_creation_when_wrapper_already_runs_in_a_renamed_window(monkeypatc
 
 
 def test_terminates_extra_duplicate_wrappers_keeping_the_oldest(monkeypatch):
-    issued_new_windows, terminated_process_ids = _record_reconcile_effects(
+    backend, issued_new_windows, terminated_process_ids = _record_reconcile_effects(
         monkeypatch,
         list_windows_stdout="silver\nsteward\n",
         running_wrappers=[
@@ -86,7 +90,9 @@ def test_terminates_extra_duplicate_wrappers_keeping_the_oldest(monkeypatch):
         ],
     )
 
-    service_module.ensure_all_agent_windows(_single_session_specification(["steward"]))
+    service_module.ensure_all_agent_windows(
+        backend, _single_session_specification(["steward"])
+    )
 
     assert terminated_process_ids == [6552], (
         "with two steward wrappers alive the reconciler must terminate the extra one "
@@ -98,13 +104,15 @@ def test_terminates_extra_duplicate_wrappers_keeping_the_oldest(monkeypatch):
 
 
 def test_terminates_orphan_wrapper_whose_agent_is_not_in_the_spec(monkeypatch):
-    issued_new_windows, terminated_process_ids = _record_reconcile_effects(
+    backend, issued_new_windows, terminated_process_ids = _record_reconcile_effects(
         monkeypatch,
         list_windows_stdout="silver\n",
         running_wrappers=[{"process_id": 333, "agent_name": "silver"}],
     )
 
-    service_module.ensure_all_agent_windows(_single_session_specification(["steward"]))
+    service_module.ensure_all_agent_windows(
+        backend, _single_session_specification(["steward"])
+    )
 
     assert terminated_process_ids == [333], (
         "a wrapper whose agent-name is not in the session spec is an orphan from a "
@@ -116,13 +124,15 @@ def test_terminates_orphan_wrapper_whose_agent_is_not_in_the_spec(monkeypatch):
 
 
 def test_creates_window_when_no_wrapper_is_running(monkeypatch):
-    issued_new_windows, terminated_process_ids = _record_reconcile_effects(
+    backend, issued_new_windows, terminated_process_ids = _record_reconcile_effects(
         monkeypatch,
         list_windows_stdout="",
         running_wrappers=[],
     )
 
-    service_module.ensure_all_agent_windows(_single_session_specification(["steward"]))
+    service_module.ensure_all_agent_windows(
+        backend, _single_session_specification(["steward"])
+    )
 
     assert issued_new_windows == ["steward"]
     assert terminated_process_ids == []

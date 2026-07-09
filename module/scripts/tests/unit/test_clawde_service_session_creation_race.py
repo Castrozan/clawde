@@ -1,6 +1,7 @@
 from clawde_service_test_helpers import (
     FakeCompletedProcess,
     load_service_module,
+    make_tmux_supervisor_backend,
 )
 
 service_module = load_service_module()
@@ -31,7 +32,7 @@ def test_session_creation_tolerates_a_concurrent_creator_without_crashing(monkey
             return FakeCompletedProcess(0, stdout="")
         return FakeCompletedProcess(0)
 
-    monkeypatch.setattr(service_module, "run_tmux_command", fake_run_tmux_command)
+    backend = make_tmux_supervisor_backend(fake_run_tmux_command)
     monkeypatch.setattr(service_module.time, "sleep", lambda _seconds: None)
 
     specification = {
@@ -43,7 +44,7 @@ def test_session_creation_tolerates_a_concurrent_creator_without_crashing(monkey
         ]
     }
 
-    service_module.ensure_all_agent_windows(specification)
+    service_module.ensure_all_agent_windows(backend, specification)
 
     assert [command for command in issued_commands if command[0] == "new-window"] == [
         ("new-window", "-t", "clawde", "-n", "betha-pm", "true")

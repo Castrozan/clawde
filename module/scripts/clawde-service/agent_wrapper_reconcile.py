@@ -154,11 +154,12 @@ def agent_names_with_running_wrapper_after_reconcile(
     surviving_process_id_by_agent_name = surviving_wrapper_process_id_by_agent_name(
         declared_agent_names, process_ids_by_agent_name
     )
-    rename_windows_to_match_running_wrapper_identity(
-        session_name,
-        {
-            process_id: agent_name
-            for agent_name, process_id in surviving_process_id_by_agent_name.items()
-        },
-    )
+    if os.environ.get("CLAWDE_MULTIPLEXER", "tmux") != "herdr":
+        rename_windows_to_match_running_wrapper_identity(
+            session_name,
+            {
+                process_id: agent_name
+                for agent_name, process_id in surviving_process_id_by_agent_name.items()
+            },
+        )
     return set(surviving_process_id_by_agent_name)

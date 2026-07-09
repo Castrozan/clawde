@@ -1,113 +1,23 @@
 import argparse
 import json
-import subprocess
-import sys
 import time
 
 import agent_wrapper_reconcile
+from supervisor_backend_base import (
+    SupervisorMultiplexerBackend,
+    select_supervisor_backend,
+)
 
-BOOTSTRAP_PLACEHOLDER_WINDOW_NAME = "__bootstrap__"
 SUPERVISOR_POLL_INTERVAL_SECONDS = 10
 AGENT_STARTUP_STAGGER_SECONDS = 2
 
 
-def run_tmux_command(*arguments: str) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["tmux", *arguments],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-
-def session_exists(session_name: str) -> bool:
-    return run_tmux_command("has-session", "-t", session_name).returncode == 0
-
-
-def window_exists(session_name: str, window_name: str) -> bool:
-    result = run_tmux_command(
-        "list-windows", "-t", session_name, "-F", "#{window_name}"
-    )
-    if result.returncode != 0:
-        return False
-    return window_name in result.stdout.splitlines()
-
-
-def create_placeholder_session_if_absent(session_name: str) -> bool:
-    if session_exists(session_name):
-        return False
-    result = run_tmux_command(
-        "new-session",
-        "-d",
-        "-s",
-        session_name,
-        "-n",
-        BOOTSTRAP_PLACEHOLDER_WINDOW_NAME,
-        "sleep infinity",
-    )
-    if result.returncode == 0:
-        return True
-    if session_exists(session_name):
-        return False
-    print(
-        f"Error: failed to create tmux session {session_name!r}: {result.stderr.strip()}",
-        file=sys.stderr,
-    )
-    return False
-
-
-def remove_placeholder_window(session_name: str) -> None:
-    run_tmux_command(
-        "kill-window", "-t", f"{session_name}:{BOOTSTRAP_PLACEHOLDER_WINDOW_NAME}"
-    )
-
-
-def ensure_agent_window(
-    session_name: str, window_name: str, wrapper_command: str
-) -> bool:
-    if window_exists(session_name, window_name):
-        return relaunch_wrapper_in_window(session_name, window_name, wrapper_command)
-    return create_agent_window(session_name, window_name, wrapper_command)
-
-
-def relaunch_wrapper_in_window(
-    session_name: str, window_name: str, wrapper_command: str
-) -> bool:
-    result = run_tmux_command(
-        "respawn-window",
-        "-k",
-        "-t",
-        f"{session_name}:{window_name}",
-        wrapper_command,
-    )
-    if result.returncode != 0:
-        print(
-            f"Error: failed to relaunch wrapper in tmux window {window_name!r}: {result.stderr.strip()}",
-            file=sys.stderr,
-        )
-        return False
-    return True
-
-
-def create_agent_window(
-    session_name: str, window_name: str, wrapper_command: str
-) -> bool:
-    result = run_tmux_command(
-        "new-window", "-t", session_name, "-n", window_name, wrapper_command
-    )
-    if result.returncode != 0:
-        print(
-            f"Error: failed to create tmux window {window_name!r}: {result.stderr.strip()}",
-            file=sys.stderr,
-        )
-        return False
-    return True
-
-
-def ensure_agent_windows_for_session(session_specification: dict) -> None:
+def ensure_agent_windows_for_session(
+    backend: SupervisorMultiplexerBackend, session_specification: dict
+) -> None:
     session_name = session_specification["name"]
 
-    placeholder_created = create_placeholder_session_if_absent(session_name)
+    bootstrap_scaffolding_created = backend.ensure_host_ready(session_name)
 
     declared_agent_names = {
         agent_specification["name"]
@@ -122,7 +32,7 @@ def ensure_agent_windows_for_session(session_specification: dict) -> None:
     for agent_specification in session_specification["agents"]:
         if agent_specification["name"] in agent_names_with_a_running_wrapper:
             continue
-        agent_window_was_created = ensure_agent_window(
+        agent_window_was_created = backend.ensure_agent_window(
             session_name,
             agent_specification["name"],
             agent_specification["wrapper_command"],
@@ -130,21 +40,24 @@ def ensure_agent_windows_for_session(session_specification: dict) -> None:
         if agent_window_was_created:
             time.sleep(AGENT_STARTUP_STAGGER_SECONDS)
 
-    if placeholder_created:
-        remove_placeholder_window(session_name)
+    if bootstrap_scaffolding_created:
+        backend.remove_bootstrap_scaffolding(session_name)
 
 
-def ensure_all_agent_windows(specification: dict) -> None:
+def ensure_all_agent_windows(
+    backend: SupervisorMultiplexerBackend, specification: dict
+) -> None:
     for session_specification in specification["sessions"]:
-        ensure_agent_windows_for_session(session_specification)
+        ensure_agent_windows_for_session(backend, session_specification)
 
 
 def reconcile_sessions_forever(
     specification: dict,
     poll_interval_seconds: int = SUPERVISOR_POLL_INTERVAL_SECONDS,
 ) -> None:
+    backend = select_supervisor_backend()
     while True:
-        ensure_all_agent_windows(specification)
+        ensure_all_agent_windows(backend, specification)
         time.sleep(poll_interval_seconds)
 
 
@@ -157,9 +70,10 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="clawde-service",
         description=(
-            "Idempotently ensure every declared clawde tmux session and all agent "
-            "windows exist, then reconcile forever so any session or window that "
-            "dies after startup gets recreated on the next poll."
+            "Idempotently ensure every declared clawde session and all agent windows "
+            "exist on the configured multiplexer backend, then reconcile forever so "
+            "any session or window that dies after startup gets recreated on the next "
+            "poll."
         ),
     )
     parser.add_argument(
