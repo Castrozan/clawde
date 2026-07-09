@@ -112,3 +112,63 @@ def test_dismiss_resume_modal_is_a_noop_at_an_ordinary_prompt():
     backend = _ScriptedCaptureBackend(["● already home\n❯\n"])
     backend.dismiss_resume_confirmation_modal_if_present("handle")
     assert backend.keys_sent == []
+
+
+class _ConstantCaptureBackend(pane_content.HeartbeatMultiplexerBackend):
+    def __init__(self, content):
+        self._content = content
+        self.keys_sent = []
+
+    def prepare_pane_handle(self, session_name, window_name):
+        return "handle"
+
+    def capture_recent_pane(self, pane_handle):
+        return self._content
+
+    def send_single_key_to_pane(self, pane_handle, key):
+        self.keys_sent.append(key)
+        return True
+
+
+BUSY_WORKING_PANE = (
+    "──── steward ──\n"
+    "✻ Reconciling the repo… (esc to interrupt · 160 seconds · ↑ 3.1k tokens)\n"
+)
+
+
+def test_pre_prompt_gate_passes_a_busy_working_agent(monkeypatch):
+    monkeypatch.setattr(pane_content.time, "sleep", lambda _seconds: None)
+    backend = _ConstantCaptureBackend(BUSY_WORKING_PANE)
+    assert backend.wait_until_agent_is_past_pre_prompt_gates("handle") is True
+
+
+def test_pre_prompt_gate_passes_an_idle_agent(monkeypatch):
+    monkeypatch.setattr(pane_content.time, "sleep", lambda _seconds: None)
+    backend = _ConstantCaptureBackend("● standing by\n❯\n")
+    assert backend.wait_until_agent_is_past_pre_prompt_gates("handle") is True
+
+
+def test_pre_prompt_gate_gives_up_when_wedged_at_onboarding(monkeypatch):
+    monkeypatch.setattr(pane_content.time, "sleep", lambda _seconds: None)
+    backend = _ConstantCaptureBackend(
+        "Select login method\n❯ 1. Claude account with subscription"
+    )
+    assert backend.wait_until_agent_is_past_pre_prompt_gates("handle") is False
+
+
+def test_pre_prompt_gate_dismisses_then_passes_after_resume_modal(monkeypatch):
+    monkeypatch.setattr(pane_content.time, "sleep", lambda _seconds: None)
+    backend = _ScriptedCaptureBackend(
+        [RESUME_CONFIRMATION_MODAL_PANE, "● resumed\n❯\n"]
+    )
+    assert backend.wait_until_agent_is_past_pre_prompt_gates("handle") is True
+    assert backend.keys_sent == ["Enter"]
+
+
+def test_pre_prompt_gate_gives_up_but_keeps_dismissing_a_stuck_resume_modal(
+    monkeypatch,
+):
+    monkeypatch.setattr(pane_content.time, "sleep", lambda _seconds: None)
+    backend = _ConstantCaptureBackend(RESUME_CONFIRMATION_MODAL_PANE)
+    assert backend.wait_until_agent_is_past_pre_prompt_gates("handle") is False
+    assert backend.keys_sent == ["Enter"] * pane_content.MAX_WAIT_ATTEMPTS

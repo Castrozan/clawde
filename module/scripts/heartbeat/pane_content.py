@@ -69,6 +69,25 @@ class HeartbeatMultiplexerBackend:
             time.sleep(2)
         return False
 
+    def wait_until_agent_is_past_pre_prompt_gates(self, pane_handle) -> bool:
+        time.sleep(INITIAL_DELAY_SECONDS)
+
+        for _ in range(MAX_WAIT_ATTEMPTS):
+            content = self.capture_recent_pane(pane_handle)
+            if content is not None:
+                if pane_is_at_onboarding(content):
+                    time.sleep(5)
+                    continue
+                if pane_indicates_resume_confirmation_modal(content):
+                    self.send_single_key_to_pane(
+                        pane_handle, RESUME_MODAL_SUMMARY_RESUME_KEY
+                    )
+                    time.sleep(RESUME_MODAL_DISMISS_DELAY_SECONDS)
+                    continue
+                return True
+            time.sleep(2)
+        return False
+
     def pane_is_idle(self, pane_handle) -> bool:
         content = self.capture_recent_pane(pane_handle)
         return content is not None and pane_is_at_claude_repl_prompt(content)

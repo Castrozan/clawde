@@ -79,10 +79,11 @@ def main() -> None:
         print("Error: could not resolve agent pane", file=sys.stderr)
         sys.exit(1)
 
-    if not backend.wait_for_claude_prompt(pane_handle):
+    if not backend.wait_until_agent_is_past_pre_prompt_gates(pane_handle):
         print(
-            "Error: claude REPL prompt not detected after waiting. "
-            "Agent may be stuck at onboarding. Not driving heartbeat.",
+            "Error: claude did not get past onboarding or the resume-confirmation "
+            "modal after waiting; it is wedged at a pre-prompt gate. "
+            "Not driving heartbeat.",
             file=sys.stderr,
         )
         sys.exit(1)
