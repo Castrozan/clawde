@@ -76,6 +76,7 @@ let
         "HOME=${homeDir}"
         "TMUX_TMPDIR=%t"
         "XDG_RUNTIME_DIR=%t"
+        "CLAWDE_MULTIPLEXER=${config.clawde.multiplexer}"
       ];
     };
     Install = {
@@ -93,6 +94,7 @@ let
       EnvironmentVariables = {
         PATH = clawdeRuntimePaths;
         HOME = homeDir;
+        CLAWDE_MULTIPLEXER = config.clawde.multiplexer;
       };
       StandardOutPath = "${homeDir}/Library/Logs/clawde.out.log";
       StandardErrorPath = "${homeDir}/Library/Logs/clawde.err.log";
