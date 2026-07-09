@@ -3,12 +3,12 @@ import signal
 import subprocess
 import time
 
+from multiplexer_pane_capture import capture_pane_content
 from restart_scheduling import should_rotate_session
 from stuck_indicators import pane_poll_is_stuck_evidence
 
 WATCHDOG_POLL_INTERVAL_SECONDS = 30
 WATCHDOG_CONSECUTIVE_STUCK_THRESHOLD = 2
-PANE_CAPTURE_LINE_COUNT = 80
 HEARTBEAT_DRIVER_LOG_SUBDIRECTORY = "heartbeat-driver-logs"
 
 
@@ -27,23 +27,6 @@ def open_heartbeat_driver_log_sink(heartbeat_driver_log_path: str | None):
         return subprocess.DEVNULL
     os.makedirs(os.path.dirname(heartbeat_driver_log_path), exist_ok=True)
     return open(heartbeat_driver_log_path, "a")
-
-
-def capture_pane_content(tmux_target: str) -> str | None:
-    result = subprocess.run(
-        [
-            "tmux",
-            "capture-pane",
-            "-p",
-            "-t",
-            tmux_target,
-            "-S",
-            f"-{PANE_CAPTURE_LINE_COUNT}",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    return result.stdout if result.returncode == 0 else None
 
 
 def collect_descendant_process_ids(parent_process_id: int) -> list[int]:

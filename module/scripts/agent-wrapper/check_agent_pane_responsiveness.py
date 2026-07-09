@@ -1,31 +1,13 @@
 import argparse
-import subprocess
 import sys
 import time
 
+from multiplexer_pane_capture import capture_pane_content
 from stuck_indicators import pane_poll_is_stuck_evidence
 
-PANE_CAPTURE_LINE_COUNT = 80
 SECONDS_BETWEEN_CAPTURES = 3
 HEALTHY_EXIT_CODE = 0
 UNRESPONSIVE_EXIT_CODE = 1
-
-
-def capture_pane_content(tmux_target: str) -> str | None:
-    result = subprocess.run(
-        [
-            "tmux",
-            "capture-pane",
-            "-p",
-            "-t",
-            tmux_target,
-            "-S",
-            f"-{PANE_CAPTURE_LINE_COUNT}",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    return result.stdout if result.returncode == 0 else None
 
 
 def determine_pane_health_exit_code(
@@ -41,10 +23,11 @@ def determine_pane_health_exit_code(
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="check-agent-pane-responsiveness",
-        description="Exit non-zero when a clawde agent's tmux pane is unresponsive: "
+        description="Exit non-zero when a clawde agent's pane is unresponsive: "
         "frozen and not at the idle prompt across two captures, or showing a "
         "usage-limit modal. Captures twice so a working agent that merely mentions "
-        "an error is not flagged.",
+        "an error is not flagged. Captures via the active multiplexer backend "
+        "(tmux or herdr) selected by CLAWDE_MULTIPLEXER.",
     )
     parser.add_argument(
         "--tmux-target",
