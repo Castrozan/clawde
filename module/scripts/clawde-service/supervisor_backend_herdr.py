@@ -1,8 +1,8 @@
-import json
 import subprocess
 import sys
 import time
 
+from herdr_query_operations import HerdrQueryOperations
 from supervisor_backend_base import (
     MULTIPLEXER_ENVIRONMENT_VARIABLE,
     SupervisorMultiplexerBackend,
@@ -11,34 +11,10 @@ from supervisor_backend_base import (
 HERDR_SERVER_STARTUP_WAIT_ATTEMPTS = 30
 HERDR_SERVER_STARTUP_WAIT_DELAY_SECONDS = 0.5
 HERDR_MULTIPLEXER_ENVIRONMENT_VALUE = "herdr"
+HERDR_DEFAULT_WORKSPACE_TAB_LABEL = "1"
 
 
-class HerdrSupervisorBackend(SupervisorMultiplexerBackend):
-    def run_herdr_command(self, *arguments: str) -> subprocess.CompletedProcess:
-        return subprocess.run(
-            ["herdr", *arguments],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-
-    def parse_herdr_json(self, stdout: str) -> dict | None:
-        try:
-            return json.loads(stdout)
-        except (ValueError, TypeError):
-            return None
-
-    def herdr_server_is_running(self) -> bool:
-        result = self.run_herdr_command("session", "list", "--json")
-        if result.returncode != 0:
-            return False
-        session_list = self.parse_herdr_json(result.stdout)
-        if session_list is None:
-            return False
-        return any(
-            session.get("running") for session in session_list.get("sessions", [])
-        )
-
+class HerdrSupervisorBackend(HerdrQueryOperations, SupervisorMultiplexerBackend):
     def start_headless_herdr_server(self) -> None:
         subprocess.Popen(
             ["herdr", "server"],
@@ -48,9 +24,9 @@ class HerdrSupervisorBackend(SupervisorMultiplexerBackend):
             start_new_session=True,
         )
 
-    def ensure_host_ready(self, session_name: str) -> bool:
+    def ensure_server_running(self) -> bool:
         if self.herdr_server_is_running():
-            return False
+            return True
         self.start_headless_herdr_server()
         for _ in range(HERDR_SERVER_STARTUP_WAIT_ATTEMPTS):
             if self.herdr_server_is_running():
@@ -62,40 +38,26 @@ class HerdrSupervisorBackend(SupervisorMultiplexerBackend):
         )
         return False
 
-    def find_agent_tab(self, agent_name: str) -> dict | None:
-        result = self.run_herdr_command("tab", "list")
-        if result.returncode != 0:
-            return None
-        tab_list = self.parse_herdr_json(result.stdout)
-        if tab_list is None:
-            return None
-        return next(
-            (
-                tab
-                for tab in tab_list.get("result", {}).get("tabs", [])
-                if tab.get("label") == agent_name
-            ),
-            None,
-        )
+    def ensure_workspace(self, workspace_label: str) -> str | None:
+        existing_workspace_id = self.find_workspace_id_for_label(workspace_label)
+        if existing_workspace_id is not None:
+            return existing_workspace_id
+        return self.create_workspace(workspace_label)
 
-    def resolve_pane_id_for_tab_id(self, tab_id: str) -> str | None:
-        result = self.run_herdr_command("pane", "list")
-        if result.returncode != 0:
+    def find_agent_tab(self, workspace_label: str, agent_name: str) -> dict | None:
+        workspace_id = self.find_workspace_id_for_label(workspace_label)
+        if workspace_id is None:
             return None
-        pane_list = self.parse_herdr_json(result.stdout)
-        if pane_list is None:
+        tabs = self.list_workspace_tabs(workspace_id)
+        if tabs is None:
             return None
         return next(
-            (
-                pane["pane_id"]
-                for pane in pane_list.get("result", {}).get("panes", [])
-                if pane.get("tab_id") == tab_id
-            ),
+            (tab for tab in tabs if tab.get("label") == agent_name),
             None,
         )
 
     def agent_window_exists(self, session_name: str, agent_name: str) -> bool:
-        return self.find_agent_tab(agent_name) is not None
+        return self.find_agent_tab(session_name, agent_name) is not None
 
     def run_wrapper_in_pane(self, pane_id: str, wrapper_command: str) -> bool:
         wrapper_command_with_multiplexer_environment = (
@@ -117,13 +79,22 @@ class HerdrSupervisorBackend(SupervisorMultiplexerBackend):
     def create_agent_window(
         self, session_name: str, agent_name: str, wrapper_command: str
     ) -> bool:
+        workspace_id = self.ensure_workspace(session_name)
+        if workspace_id is None:
+            return False
         create_result = self.run_herdr_command(
-            "tab", "create", "--label", agent_name, "--no-focus"
+            "tab",
+            "create",
+            "--workspace",
+            workspace_id,
+            "--label",
+            agent_name,
+            "--no-focus",
         )
         if create_result.returncode != 0:
             print(
-                f"Error: failed to create herdr tab {agent_name!r}: "
-                f"{create_result.stderr.strip()}",
+                f"Error: failed to create herdr tab {agent_name!r} in workspace "
+                f"{session_name!r}: {create_result.stderr.strip()}",
                 file=sys.stderr,
             )
             return False
@@ -138,7 +109,7 @@ class HerdrSupervisorBackend(SupervisorMultiplexerBackend):
     def relaunch_wrapper_in_window(
         self, session_name: str, agent_name: str, wrapper_command: str
     ) -> bool:
-        tab = self.find_agent_tab(agent_name)
+        tab = self.find_agent_tab(session_name, agent_name)
         if tab is None:
             return self.create_agent_window(session_name, agent_name, wrapper_command)
         pane_id = self.resolve_pane_id_for_tab_id(tab["tab_id"])
@@ -146,5 +117,28 @@ class HerdrSupervisorBackend(SupervisorMultiplexerBackend):
             return self.create_agent_window(session_name, agent_name, wrapper_command)
         return self.run_wrapper_in_pane(pane_id, wrapper_command)
 
+    def ensure_host_ready(self, session_name: str) -> bool:
+        if not self.ensure_server_running():
+            return False
+        if self.find_workspace_id_for_label(session_name) is not None:
+            return False
+        return self.create_workspace(session_name) is not None
+
     def remove_bootstrap_scaffolding(self, session_name: str) -> None:
-        return None
+        workspace_id = self.find_workspace_id_for_label(session_name)
+        if workspace_id is None:
+            return
+        tabs = self.list_workspace_tabs(workspace_id)
+        if tabs is None or len(tabs) <= 1:
+            return
+        bootstrap_tab = next(
+            (
+                tab
+                for tab in tabs
+                if tab.get("label") == HERDR_DEFAULT_WORKSPACE_TAB_LABEL
+            ),
+            None,
+        )
+        if bootstrap_tab is None:
+            return
+        self.run_herdr_command("tab", "close", bootstrap_tab["tab_id"])

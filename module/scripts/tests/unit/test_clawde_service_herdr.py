@@ -1,89 +1,111 @@
-import importlib.util
 import pathlib
 import sys
 
-SERVICE_DIRECTORY = (
-    pathlib.Path(__file__).resolve().parent.parent.parent / "clawde-service"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+from herdr_backend_test_support import (
+    PANE_LIST_JSON,
+    TAB_CREATE_JSON,
+    TAB_LIST_WP,
+    TAB_LIST_WP_ONLY_BOOTSTRAP,
+    WORKSPACE_CREATE_CLAWDE,
+    WORKSPACE_LIST_WITH_CLAWDE,
+    WORKSPACE_LIST_WITHOUT_CLAWDE,
+    backend_with_responses,
+    base,
+    herdr_backend,
 )
 
 
-def _load_module(module_file_name, module_import_name):
-    if str(SERVICE_DIRECTORY) not in sys.path:
-        sys.path.insert(0, str(SERVICE_DIRECTORY))
-    module_path = SERVICE_DIRECTORY / module_file_name
-    module_spec = importlib.util.spec_from_file_location(
-        module_import_name, module_path
-    )
-    module = importlib.util.module_from_spec(module_spec)
-    sys.modules[module_import_name] = module
-    module_spec.loader.exec_module(module)
-    return module
-
-
-herdr_backend = _load_module("supervisor_backend_herdr.py", "supervisor_backend_herdr")
-base = _load_module("supervisor_backend_base.py", "supervisor_backend_base")
-
-
-class _CompletedProcessStub:
-    def __init__(self, returncode, stdout):
-        self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = ""
-
-
-TAB_LIST_JSON = (
-    '{"result":{"tabs":['
-    '{"tab_id":"wP:t1","label":"1"},'
-    '{"tab_id":"wP:t7","label":"bronze"}'
-    "]}}"
-)
-PANE_LIST_JSON = '{"result":{"panes":[{"pane_id":"wP:p7","tab_id":"wP:t7"}]}}'
-TAB_CREATE_JSON = '{"result":{"root_pane":{"pane_id":"wP:p9","tab_id":"wP:t9"}}}'
-
-
-def test_agent_window_exists_matches_tab_label():
-    backend = herdr_backend.HerdrSupervisorBackend()
-    backend.run_herdr_command = lambda *arguments: _CompletedProcessStub(
-        0, TAB_LIST_JSON
+def test_agent_window_exists_is_scoped_to_the_target_workspace():
+    backend = backend_with_responses(
+        [],
+        [
+            (("workspace", "list"), WORKSPACE_LIST_WITH_CLAWDE),
+            (("tab", "list", "--workspace"), TAB_LIST_WP),
+        ],
     )
     assert backend.agent_window_exists("clawde", "bronze")
     assert not backend.agent_window_exists("clawde", "does-not-exist")
 
 
-def test_create_agent_window_makes_labeled_tab_then_runs_wrapper():
-    backend = herdr_backend.HerdrSupervisorBackend()
+def test_agent_window_absent_when_tab_lives_in_another_workspace():
+    backend = backend_with_responses(
+        [],
+        [
+            (("workspace", "list"), WORKSPACE_LIST_WITH_CLAWDE),
+            (("tab", "list", "--workspace"), TAB_LIST_WP_ONLY_BOOTSTRAP),
+        ],
+    )
+    assert not backend.agent_window_exists("clawde", "bronze")
+
+
+def test_create_agent_window_targets_the_resolved_workspace():
     issued = []
-
-    def fake_run(*arguments):
-        issued.append(arguments)
-        if arguments[:2] == ("tab", "create"):
-            return _CompletedProcessStub(0, TAB_CREATE_JSON)
-        return _CompletedProcessStub(0, "")
-
-    backend.run_herdr_command = fake_run
+    backend = backend_with_responses(
+        issued,
+        [
+            (("workspace", "list"), WORKSPACE_LIST_WITH_CLAWDE),
+            (("tab", "create"), TAB_CREATE_JSON),
+        ],
+    )
     assert backend.create_agent_window("clawde", "bronze", "exec /nix/store/x-agent")
-    assert issued[0] == ("tab", "create", "--label", "bronze", "--no-focus")
-    assert issued[1] == (
+    assert (
+        "tab",
+        "create",
+        "--workspace",
+        "wP",
+        "--label",
+        "bronze",
+        "--no-focus",
+    ) in issued
+    assert (
         "pane",
         "run",
-        "wP:p9",
+        "wZ:p9",
         "CLAWDE_MULTIPLEXER=herdr exec /nix/store/x-agent",
-    )
+    ) in issued
 
 
-def test_relaunch_runs_wrapper_in_existing_tab_pane():
-    backend = herdr_backend.HerdrSupervisorBackend()
+def test_create_agent_window_creates_the_workspace_when_missing():
     issued = []
+    backend = backend_with_responses(
+        issued,
+        [
+            (("workspace", "list"), WORKSPACE_LIST_WITHOUT_CLAWDE),
+            (("workspace", "create"), WORKSPACE_CREATE_CLAWDE),
+            (("tab", "create"), TAB_CREATE_JSON),
+        ],
+    )
+    assert backend.create_agent_window("clawde", "bronze", "exec /nix/store/x-agent")
+    assert (
+        "workspace",
+        "create",
+        "--label",
+        "clawde",
+        "--no-focus",
+    ) in issued
+    assert (
+        "tab",
+        "create",
+        "--workspace",
+        "wZ",
+        "--label",
+        "bronze",
+        "--no-focus",
+    ) in issued
 
-    def fake_run(*arguments):
-        issued.append(arguments)
-        if arguments[:2] == ("tab", "list"):
-            return _CompletedProcessStub(0, TAB_LIST_JSON)
-        if arguments[:2] == ("pane", "list"):
-            return _CompletedProcessStub(0, PANE_LIST_JSON)
-        return _CompletedProcessStub(0, "")
 
-    backend.run_herdr_command = fake_run
+def test_relaunch_runs_wrapper_in_existing_workspace_scoped_tab_pane():
+    issued = []
+    backend = backend_with_responses(
+        issued,
+        [
+            (("workspace", "list"), WORKSPACE_LIST_WITH_CLAWDE),
+            (("tab", "list", "--workspace"), TAB_LIST_WP),
+            (("pane", "list"), PANE_LIST_JSON),
+        ],
+    )
     assert backend.relaunch_wrapper_in_window(
         "clawde", "bronze", "exec /nix/store/x-agent"
     )
@@ -93,14 +115,6 @@ def test_relaunch_runs_wrapper_in_existing_tab_pane():
         "wP:p7",
         "CLAWDE_MULTIPLEXER=herdr exec /nix/store/x-agent",
     ) in issued
-
-
-def test_ensure_host_ready_is_a_noop_when_server_already_running():
-    backend = herdr_backend.HerdrSupervisorBackend()
-    backend.run_herdr_command = lambda *arguments: _CompletedProcessStub(
-        0, '{"sessions":[{"default":true,"name":"default","running":true}]}'
-    )
-    assert backend.ensure_host_ready("clawde") is False
 
 
 def test_select_supervisor_backend_dispatches_on_environment(monkeypatch):
