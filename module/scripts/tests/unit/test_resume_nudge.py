@@ -1,4 +1,5 @@
 import importlib.util
+import os
 import pathlib
 import sys
 
@@ -120,6 +121,37 @@ def test_main_injects_when_agent_has_live_claude(monkeypatch):
     resume_nudge.main()
     assert fake_backend.prepared_for == ("clawde", "bronze")
     assert fake_backend.prompts_sent == [resume_nudge.RESUME_NUDGE_PROMPT]
+
+
+def test_main_discards_inherited_pane_id_so_target_resolves_by_agent_label(monkeypatch):
+    monkeypatch.setenv("HERDR_PANE_ID", "wW:p14")
+    monkeypatch.setattr(
+        resume_nudge.sys,
+        "argv",
+        ["clawde-resume-nudge", "--session", "clawde", "--window", "bronze"],
+    )
+    monkeypatch.setattr(
+        resume_nudge, "wait_for_live_claude_repl", lambda agent_name: True
+    )
+    observed_ambient_pane_id_at_prepare = {}
+
+    class _AmbientPaneRecordingBackend(_FakeBackend):
+        def prepare_pane_handle(self, session_name, window_name):
+            observed_ambient_pane_id_at_prepare["value"] = os.environ.get(
+                "HERDR_PANE_ID"
+            )
+            return super().prepare_pane_handle(session_name, window_name)
+
+    fake_backend = _AmbientPaneRecordingBackend()
+    monkeypatch.setattr(resume_nudge, "select_heartbeat_backend", lambda: fake_backend)
+    resume_nudge.main()
+    assert observed_ambient_pane_id_at_prepare["value"] is None, (
+        "clawde-redeploy fans out one resume nudge per agent as a detached subprocess "
+        "that inherits the invoking pane's HERDR_PANE_ID; the nudge must scrub it so "
+        "the herdr backend resolves each agent's own tab by its --window label instead "
+        "of firing every agent's resume prompt into the pane that ran the rebuild"
+    )
+    assert fake_backend.prepared_for == ("clawde", "bronze")
 
 
 def test_main_dismisses_resume_confirmation_modal_before_injecting(monkeypatch):

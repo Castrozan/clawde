@@ -1,4 +1,5 @@
 import argparse
+import os
 import subprocess
 import sys
 import time
@@ -9,6 +10,7 @@ AGENT_WRAPPER_COMMAND_FRAGMENT = "agent-wrapper/wrapper.py --agent-name"
 LIVE_CLAUDE_PROCESS_NAME_FRAGMENT = "claude"
 LIVE_CLAUDE_WAIT_MAX_ATTEMPTS = 20
 LIVE_CLAUDE_WAIT_DELAY_SECONDS = 2
+INHERITED_HERDR_PANE_ID_ENVIRONMENT_VARIABLE = "HERDR_PANE_ID"
 
 RESUME_NUDGE_PROMPT = (
     "<resume>\n"
@@ -76,6 +78,10 @@ def wait_for_live_claude_repl(agent_name: str) -> bool:
     return False
 
 
+def discard_inherited_pane_id_so_target_resolves_by_agent_window_label() -> None:
+    os.environ.pop(INHERITED_HERDR_PANE_ID_ENVIRONMENT_VARIABLE, None)
+
+
 def main() -> None:
     arguments = parse_arguments()
     target_description = f"{arguments.session}:{arguments.window}"
@@ -88,6 +94,7 @@ def main() -> None:
         )
         return
 
+    discard_inherited_pane_id_so_target_resolves_by_agent_window_label()
     backend = select_heartbeat_backend()
     pane_handle = backend.prepare_pane_handle(arguments.session, arguments.window)
     if pane_handle is None:
