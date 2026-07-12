@@ -10,6 +10,8 @@ AGENT_WRAPPER_PROCESS_MATCH_PATTERN = "agent-wrapper/wrapper.py --agent-name"
 GRACE_DELAY_SECONDS_BEFORE_SIGNALING = 2
 REDEPLOY_LOG_RELATIVE_PATH = "Library/Logs/clawde-redeploy.log"
 RESUME_NUDGE_SCRIPT_ENVIRONMENT_VARIABLE = "CLAWDE_RESUME_NUDGE_SCRIPT"
+HEARTBEAT_SCRIPTS_DIRECTORY_ENVIRONMENT_VARIABLE = "CLAWDE_HEARTBEAT_SCRIPTS_DIR"
+INHERITED_HERDR_PANE_ID_ENVIRONMENT_VARIABLE = "HERDR_PANE_ID"
 AGENT_NAME_PATTERN = re.compile(r"--agent-name (\S+)")
 CONFIG_FILE_PATTERN = re.compile(r"--config-file (\S+)")
 
@@ -73,6 +75,32 @@ def signal_agent_wrappers_to_restart_on_continued_sessions(
             pass
 
 
+def load_heartbeat_backend_or_none_when_pane_state_is_unavailable():
+    heartbeat_scripts_directory = os.environ.get(
+        HEARTBEAT_SCRIPTS_DIRECTORY_ENVIRONMENT_VARIABLE
+    )
+    if not heartbeat_scripts_directory:
+        return None
+    sys.path.insert(0, heartbeat_scripts_directory)
+    from multiplexer import select_heartbeat_backend
+
+    return select_heartbeat_backend()
+
+
+def select_wrappers_with_in_flight_work_before_restart(
+    agent_wrappers: list[dict], heartbeat_backend
+) -> list[dict]:
+    os.environ.pop(INHERITED_HERDR_PANE_ID_ENVIRONMENT_VARIABLE, None)
+    wrappers_with_in_flight_work = []
+    for agent_wrapper in agent_wrappers:
+        pane_handle = heartbeat_backend.prepare_pane_handle(
+            agent_wrapper["tmux_session"], agent_wrapper["agent_name"]
+        )
+        if pane_handle is None or not heartbeat_backend.pane_is_idle(pane_handle):
+            wrappers_with_in_flight_work.append(agent_wrapper)
+    return wrappers_with_in_flight_work
+
+
 def spawn_resume_nudges(agent_wrappers: list[dict]) -> None:
     resume_nudge_script_path = os.environ.get(RESUME_NUDGE_SCRIPT_ENVIRONMENT_VARIABLE)
     if not resume_nudge_script_path:
@@ -128,13 +156,21 @@ def main() -> None:
     detach_into_background_daemon_escaping_caller_process_tree()
     time.sleep(GRACE_DELAY_SECONDS_BEFORE_SIGNALING)
     surviving_agent_wrappers = describe_agent_wrappers()
+    heartbeat_backend = load_heartbeat_backend_or_none_when_pane_state_is_unavailable()
+    wrappers_to_resume_nudge = (
+        surviving_agent_wrappers
+        if heartbeat_backend is None
+        else select_wrappers_with_in_flight_work_before_restart(
+            surviving_agent_wrappers, heartbeat_backend
+        )
+    )
     print(
         f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] clawde-redeploy signaling "
         f"{len(surviving_agent_wrappers)} wrapper(s) with SIGUSR1 and scheduling "
-        "resume nudges"
+        f"{len(wrappers_to_resume_nudge)} resume nudge(s) for agents that were mid-task"
     )
     signal_agent_wrappers_to_restart_on_continued_sessions(surviving_agent_wrappers)
-    spawn_resume_nudges(surviving_agent_wrappers)
+    spawn_resume_nudges(wrappers_to_resume_nudge)
 
 
 if __name__ == "__main__":
