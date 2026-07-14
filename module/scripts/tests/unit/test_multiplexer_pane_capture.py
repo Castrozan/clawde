@@ -114,3 +114,41 @@ def test_herdr_backend_returns_none_when_agent_tab_absent(monkeypatch):
 
     monkeypatch.setattr(multiplexer_pane_capture.subprocess, "run", fake_run)
     assert multiplexer_pane_capture.capture_pane_content("clawde:steward") is None
+
+
+def test_send_enter_uses_tmux_send_keys_when_multiplexer_unset(monkeypatch):
+    monkeypatch.delenv("CLAWDE_MULTIPLEXER", raising=False)
+    issued = {}
+
+    def fake_run(argv, **_kwargs):
+        issued["argv"] = argv
+        return _CompletedProcessStub(0, "")
+
+    monkeypatch.setattr(multiplexer_pane_capture.subprocess, "run", fake_run)
+    assert multiplexer_pane_capture.send_enter_key_to_pane("clawde:steward") is True
+    assert issued["argv"] == ["tmux", "send-keys", "-t", "clawde:steward", "Enter"]
+
+
+def test_send_enter_uses_herdr_send_keys_with_env_pane_id(monkeypatch):
+    monkeypatch.setenv("CLAWDE_MULTIPLEXER", "herdr")
+    monkeypatch.setenv("HERDR_PANE_ID", "wP:pE")
+    issued = {}
+
+    def fake_run(argv, **_kwargs):
+        issued["argv"] = argv
+        return _CompletedProcessStub(0, "")
+
+    monkeypatch.setattr(multiplexer_pane_capture.subprocess, "run", fake_run)
+    assert multiplexer_pane_capture.send_enter_key_to_pane("clawde:steward") is True
+    assert issued["argv"] == ["herdr", "pane", "send-keys", "wP:pE", "Enter"]
+
+
+def test_send_enter_returns_false_when_herdr_pane_cannot_be_resolved(monkeypatch):
+    monkeypatch.setenv("CLAWDE_MULTIPLEXER", "herdr")
+    monkeypatch.delenv("HERDR_PANE_ID", raising=False)
+    monkeypatch.setattr(
+        multiplexer_pane_capture.subprocess,
+        "run",
+        lambda *_a, **_k: _CompletedProcessStub(0, '{"result":{"tabs":[]}}'),
+    )
+    assert multiplexer_pane_capture.send_enter_key_to_pane("clawde:steward") is False

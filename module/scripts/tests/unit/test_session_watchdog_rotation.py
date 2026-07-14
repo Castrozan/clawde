@@ -42,11 +42,13 @@ def test_watchdog_rotates_long_running_session_at_day_boundary(monkeypatch):
     monkeypatch.setattr(
         session_watchdog, "terminate_process_tree", terminate_and_record
     )
-    _runtime_seconds, was_stuck_kill = session_watchdog.run_launch_command_once(
-        "sleep 30",
-        None,
-        "clawde:golden",
-        daily_session_rotation=True,
+    _runtime_seconds, was_stuck_kill, _resume_session_missing = (
+        session_watchdog.run_launch_command_once(
+            "sleep 30",
+            None,
+            "clawde:golden",
+            daily_session_rotation=True,
+        )
     )
     assert was_stuck_kill is False, (
         "a daily rotation is a clean scheduled restart, not a stuck kill, so backoff "

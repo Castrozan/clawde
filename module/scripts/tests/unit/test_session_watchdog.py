@@ -116,10 +116,12 @@ def test_watchdog_terminates_session_when_pane_is_frozen_and_not_idle(monkeypatc
     monkeypatch.setattr(
         session_watchdog, "terminate_process_tree", terminate_and_record
     )
-    _runtime_seconds, was_stuck_kill = session_watchdog.run_launch_command_once(
-        "sleep 30",
-        None,
-        "clawde:golden",
+    _runtime_seconds, was_stuck_kill, _resume_session_missing = (
+        session_watchdog.run_launch_command_once(
+            "sleep 30",
+            None,
+            "clawde:golden",
+        )
     )
     assert was_stuck_kill is True
     assert len(terminated_process_ids) == 1
@@ -139,10 +141,12 @@ def test_watchdog_terminates_when_heartbeat_driver_gives_up_on_repl(monkeypatch)
     monkeypatch.setattr(
         session_watchdog, "terminate_process_tree", terminate_and_record
     )
-    _runtime_seconds, was_stuck_kill = session_watchdog.run_launch_command_once(
-        "sleep 30",
-        ["bash", "-c", "exit 1"],
-        "clawde:steward",
+    _runtime_seconds, was_stuck_kill, _resume_session_missing = (
+        session_watchdog.run_launch_command_once(
+            "sleep 30",
+            ["bash", "-c", "exit 1"],
+            "clawde:steward",
+        )
     )
     assert was_stuck_kill is True, (
         "when the heartbeat driver exits because it never found a live REPL, the "

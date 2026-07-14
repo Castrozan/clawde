@@ -4,6 +4,15 @@ USAGE_LIMIT_MODAL_INDICATORS = [
     "You've hit your weekly limit",
 ]
 
+RESUME_CONFIRMATION_MODAL_INDICATORS = [
+    "Resuming the full session will consume",
+    "Resume full session as-is",
+]
+
+MISSING_RESUME_SESSION_INDICATORS = [
+    "No conversation found with session ID",
+]
+
 REPL_PROMPT_MARKER = "❯"
 AUTOSUGGESTION_GHOST_SEPARATOR = "\xa0"
 ONBOARDING_INDICATORS = [
@@ -16,6 +25,18 @@ ONBOARDING_INDICATORS = [
 
 def pane_indicates_usage_limit_modal(pane_content: str) -> bool:
     return any(indicator in pane_content for indicator in USAGE_LIMIT_MODAL_INDICATORS)
+
+
+def pane_indicates_resume_confirmation_modal(pane_content: str) -> bool:
+    return all(
+        indicator in pane_content for indicator in RESUME_CONFIRMATION_MODAL_INDICATORS
+    )
+
+
+def pane_indicates_missing_resume_session(pane_content: str) -> bool:
+    return any(
+        indicator in pane_content for indicator in MISSING_RESUME_SESSION_INDICATORS
+    )
 
 
 def pane_is_at_onboarding(pane_content: str) -> bool:

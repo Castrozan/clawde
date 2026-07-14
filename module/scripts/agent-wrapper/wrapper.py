@@ -14,18 +14,17 @@ from active_hours_override import (
 from redeploy_signals import (
     install_exit_signal_handlers,
     install_redeploy_signal_handler,
-    redeploy_signal_state,
     register_current_child_process_id,
 )
+from launch_session import decide_and_persist_launch_session
+from session_store import clear_persisted_session_record
 from restart_scheduling import (
     INITIAL_RESTART_DELAY_SECONDS,
     MAXIMUM_RESTART_DELAY_SECONDS,
     is_within_active_hours,
     seconds_until_active_hours_start,
     should_reset_backoff,
-    should_rotate_session,
 )
-from session_identity import resolve_resume_flag_and_session_identifier
 from session_watchdog import (
     heartbeat_driver_log_path_for_agent,
     run_launch_command_once,
@@ -45,8 +44,6 @@ def load_agent_launch_config(config_file_path: str) -> dict:
 
 def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
     restart_delay_seconds = INITIAL_RESTART_DELAY_SECONDS
-    last_fresh_start_date: str | None = None
-    current_session_identifier: str | None = None
 
     while True:
         try:
@@ -99,7 +96,6 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
                 flush=True,
             )
             time.sleep(sleep_seconds)
-            last_fresh_start_date = None
             continue
 
         if not within_active_hours:
@@ -110,34 +106,40 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
                 flush=True,
             )
 
-        if should_rotate_session(daily_session_rotation, last_fresh_start_date):
+        launch_session = decide_and_persist_launch_session(
+            runtime_root_directory,
+            agent_name,
+            daily_session_rotation,
+        )
+        if launch_session.rotating_session:
             print(
                 f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
                 f"Agent {agent_name} daily session rotation. Starting fresh.",
                 flush=True,
             )
-            last_fresh_start_date = None
-            redeploy_signal_state.resume_requested = False
 
-        if last_fresh_start_date is None:
-            last_fresh_start_date = time.strftime("%Y-%m-%d")
-
-        resume_requested = redeploy_signal_state.resume_requested
-        redeploy_signal_state.resume_requested = False
-        resume_flag, current_session_identifier = (
-            resolve_resume_flag_and_session_identifier(
-                resume_requested, current_session_identifier
+        runtime_seconds, was_stuck_kill, resume_session_missing = (
+            run_launch_command_once(
+                launch_command,
+                heartbeat_driver_argv,
+                tmux_target,
+                resume_flag=launch_session.resume_flag,
+                register_child_pid=register_current_child_process_id,
+                daily_session_rotation=daily_session_rotation,
+                heartbeat_driver_log_path=heartbeat_driver_log_path,
+                is_resume_launch=launch_session.resume_previous_session,
             )
         )
-        runtime_seconds, was_stuck_kill = run_launch_command_once(
-            launch_command,
-            heartbeat_driver_argv,
-            tmux_target,
-            resume_flag=resume_flag,
-            register_child_pid=register_current_child_process_id,
-            daily_session_rotation=daily_session_rotation,
-            heartbeat_driver_log_path=heartbeat_driver_log_path,
-        )
+
+        if resume_session_missing:
+            print(
+                f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
+                f"Agent {agent_name} could not resume its pinned session "
+                "(no conversation found); dropping the stale session so the next "
+                "launch starts a fresh one.",
+                flush=True,
+            )
+            clear_persisted_session_record(launch_session.session_record_file_path)
 
         now_after_run = datetime.datetime.now()
         if not active_hours_gate_allows_run(

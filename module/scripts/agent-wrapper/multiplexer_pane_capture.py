@@ -98,3 +98,28 @@ def capture_pane_content(tmux_target: str) -> str | None:
     if os.environ.get(MULTIPLEXER_ENVIRONMENT_VARIABLE) == HERDR_MULTIPLEXER_VALUE:
         return capture_herdr_pane_content(tmux_target)
     return capture_tmux_pane_content(tmux_target)
+
+
+def send_enter_key_to_tmux_pane(tmux_target: str) -> bool:
+    result = subprocess.run(
+        ["tmux", "send-keys", "-t", tmux_target, "Enter"],
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0
+
+
+def send_enter_key_to_herdr_pane(tmux_target: str) -> bool:
+    pane_id = os.environ.get(
+        HERDR_PANE_ID_ENVIRONMENT_VARIABLE
+    ) or resolve_herdr_pane_id_for_agent(agent_name_from_tmux_target(tmux_target))
+    if not pane_id:
+        return False
+    result = run_herdr_command("pane", "send-keys", pane_id, "Enter")
+    return result.returncode == 0
+
+
+def send_enter_key_to_pane(tmux_target: str) -> bool:
+    if os.environ.get(MULTIPLEXER_ENVIRONMENT_VARIABLE) == HERDR_MULTIPLEXER_VALUE:
+        return send_enter_key_to_herdr_pane(tmux_target)
+    return send_enter_key_to_tmux_pane(tmux_target)

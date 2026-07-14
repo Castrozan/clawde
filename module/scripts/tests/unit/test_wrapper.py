@@ -28,6 +28,7 @@ class _StopSupervising(Exception):
 
 
 def _write_launch_config(config_path, launch_command, daily_session_rotation=False):
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
         json.dumps(
             {
@@ -42,8 +43,37 @@ def _write_launch_config(config_path, launch_command, daily_session_rotation=Fal
     )
 
 
+def _launch_config_path(tmp_path):
+    return tmp_path / "launch-config" / "agent.json"
+
+
+def _run_supervisor_capturing_resume_flags(monkeypatch, config_file, run_results):
+    observed_resume_flags = []
+
+    def fake_run_launch_command_once(
+        launch_command, heartbeat_driver_argv, tmux_target, **kwargs
+    ):
+        index = len(observed_resume_flags)
+        observed_resume_flags.append(kwargs.get("resume_flag"))
+        if index < len(run_results):
+            return run_results[index]
+        raise _StopSupervising()
+
+    monkeypatch.setattr(
+        wrapper, "run_launch_command_once", fake_run_launch_command_once
+    )
+    monkeypatch.setattr(
+        wrapper, "is_within_active_hours", lambda start, end, now=None: True
+    )
+    monkeypatch.setattr(wrapper.time, "sleep", lambda seconds: None)
+
+    with pytest.raises(_StopSupervising):
+        wrapper.supervise_agent_forever("steward", str(config_file))
+    return observed_resume_flags
+
+
 def test_load_agent_launch_config_reads_json(tmp_path):
-    config_file = tmp_path / "agent.json"
+    config_file = _launch_config_path(tmp_path)
     _write_launch_config(config_file, "claude --name steward")
     assert (
         wrapper.load_agent_launch_config(str(config_file))["launch_command"]
@@ -52,7 +82,7 @@ def test_load_agent_launch_config_reads_json(tmp_path):
 
 
 def test_supervise_rereads_config_on_each_restart(monkeypatch, tmp_path):
-    config_file = tmp_path / "agent.json"
+    config_file = _launch_config_path(tmp_path)
     _write_launch_config(config_file, "first")
     launch_commands_run = []
 
@@ -62,7 +92,7 @@ def test_supervise_rereads_config_on_each_restart(monkeypatch, tmp_path):
         launch_commands_run.append(launch_command)
         if len(launch_commands_run) == 1:
             _write_launch_config(config_file, "second")
-            return (0.0, False)
+            return (0.0, False, False)
         raise _StopSupervising()
 
     monkeypatch.setattr(
@@ -71,7 +101,6 @@ def test_supervise_rereads_config_on_each_restart(monkeypatch, tmp_path):
     monkeypatch.setattr(
         wrapper, "is_within_active_hours", lambda start, end, now=None: True
     )
-    monkeypatch.setattr(wrapper, "should_rotate_session", lambda rotation, date: False)
     monkeypatch.setattr(wrapper.time, "sleep", lambda seconds: None)
 
     with pytest.raises(_StopSupervising):
@@ -80,76 +109,39 @@ def test_supervise_rereads_config_on_each_restart(monkeypatch, tmp_path):
     assert launch_commands_run == ["first", "second"]
 
 
-def test_session_rotation_drops_pending_resume_so_relaunch_is_fresh(
+def test_supervise_resumes_the_pinned_session_on_the_next_restart(
     monkeypatch, tmp_path
 ):
-    config_file = tmp_path / "agent.json"
-    _write_launch_config(config_file, "claude", daily_session_rotation=True)
-    wrapper.redeploy_signal_state.resume_requested = True
-    observed_resume_flags = []
-
-    def fake_run_launch_command_once(
-        launch_command, heartbeat_driver_argv, tmux_target, **kwargs
-    ):
-        observed_resume_flags.append(kwargs.get("resume_flag"))
-        raise _StopSupervising()
-
-    monkeypatch.setattr(
-        wrapper, "run_launch_command_once", fake_run_launch_command_once
-    )
-    monkeypatch.setattr(
-        wrapper, "is_within_active_hours", lambda start, end, now=None: True
-    )
-    monkeypatch.setattr(wrapper, "should_rotate_session", lambda rotation, date: True)
-    monkeypatch.setattr(wrapper.time, "sleep", lambda seconds: None)
-
-    with pytest.raises(_StopSupervising):
-        wrapper.supervise_agent_forever("steward", str(config_file))
-
-    assert len(observed_resume_flags) == 1
-    assert observed_resume_flags[0].startswith("--session-id "), (
-        "a pending redeploy that lands on a session-rotation day must launch fresh "
-        "with a brand-new pinned --session-id, not --resume onto a day-old session "
-        "that raises the resume-confirmation dialog and wedges the agent"
-    )
-
-
-def test_redeploy_resumes_the_same_pinned_session_the_fresh_launch_created(
-    monkeypatch, tmp_path
-):
-    config_file = tmp_path / "agent.json"
+    config_file = _launch_config_path(tmp_path)
     _write_launch_config(config_file, "claude")
-    wrapper.redeploy_signal_state.resume_requested = False
-    observed_resume_flags = []
-
-    def fake_run_launch_command_once(
-        launch_command, heartbeat_driver_argv, tmux_target, **kwargs
-    ):
-        observed_resume_flags.append(kwargs.get("resume_flag"))
-        if len(observed_resume_flags) == 1:
-            wrapper.redeploy_signal_state.resume_requested = True
-            return (0.0, False)
-        raise _StopSupervising()
-
-    monkeypatch.setattr(
-        wrapper, "run_launch_command_once", fake_run_launch_command_once
+    observed = _run_supervisor_capturing_resume_flags(
+        monkeypatch, config_file, [(0.0, False, False)]
     )
-    monkeypatch.setattr(
-        wrapper, "is_within_active_hours", lambda start, end, now=None: True
-    )
-    monkeypatch.setattr(wrapper, "should_rotate_session", lambda rotation, date: False)
-    monkeypatch.setattr(wrapper.time, "sleep", lambda seconds: None)
 
-    with pytest.raises(_StopSupervising):
-        wrapper.supervise_agent_forever("steward", str(config_file))
-
-    fresh_launch_flag, redeploy_resume_flag = observed_resume_flags
+    fresh_launch_flag, restart_resume_flag = observed
     assert fresh_launch_flag.startswith("--session-id ")
     pinned_session_id = fresh_launch_flag.removeprefix("--session-id ")
-    assert redeploy_resume_flag == f"--resume {pinned_session_id}", (
-        "a rebuild redeploy must resume the exact session id the fresh launch pinned, "
-        "not --continue onto whatever session was most recently active in the cwd"
+    assert restart_resume_flag == f"--resume {pinned_session_id}", (
+        "when the agent process dies and the supervisor relaunches it, the wrapper "
+        "must resume the exact session id the previous launch pinned to disk"
     )
+
+
+def test_supervise_drops_a_dead_session_and_relaunches_fresh(monkeypatch, tmp_path):
+    config_file = _launch_config_path(tmp_path)
+    _write_launch_config(config_file, "claude")
+    observed = _run_supervisor_capturing_resume_flags(
+        monkeypatch, config_file, [(0.0, False, False), (0.0, False, True)]
+    )
+
+    fresh_launch_flag, resume_flag, relaunch_flag = observed
+    pinned_session_id = fresh_launch_flag.removeprefix("--session-id ")
+    assert resume_flag == f"--resume {pinned_session_id}"
+    assert relaunch_flag.startswith("--session-id "), (
+        "after a resume reports the session no longer exists, the wrapper must drop "
+        "the stale id and pin a brand-new session instead of resuming it forever"
+    )
+    assert relaunch_flag.removeprefix("--session-id ") != pinned_session_id
 
 
 def test_supervise_retries_when_config_unreadable(monkeypatch, tmp_path):

@@ -3,12 +3,19 @@ import signal
 import subprocess
 import time
 
-from multiplexer_pane_capture import capture_pane_content
+from multiplexer_pane_capture import capture_pane_content, send_enter_key_to_pane
 from restart_scheduling import should_rotate_session
-from stuck_indicators import pane_poll_is_stuck_evidence
+from stuck_indicators import (
+    pane_indicates_missing_resume_session,
+    pane_indicates_resume_confirmation_modal,
+    pane_is_at_idle_repl_prompt,
+    pane_poll_is_stuck_evidence,
+)
 
 WATCHDOG_POLL_INTERVAL_SECONDS = 30
 WATCHDOG_CONSECUTIVE_STUCK_THRESHOLD = 2
+RESUME_MODAL_WATCH_MAX_POLLS = 5
+RESUME_MODAL_TAIL_LINE_COUNT = 15
 HEARTBEAT_DRIVER_LOG_SUBDIRECTORY = "heartbeat-driver-logs"
 
 
@@ -59,6 +66,22 @@ def heartbeat_driver_has_given_up(
     return driver_process is not None and driver_process.poll() is not None
 
 
+def pane_tail_shows_resume_confirmation_modal(pane_content: str) -> bool:
+    pane_tail = "\n".join(pane_content.splitlines()[-RESUME_MODAL_TAIL_LINE_COUNT:])
+    return pane_indicates_resume_confirmation_modal(pane_tail)
+
+
+def resume_launch_hit_missing_session(
+    is_resume_launch: bool, was_stuck_kill: bool, tmux_target: str | None
+) -> bool:
+    if not is_resume_launch or was_stuck_kill or tmux_target is None:
+        return False
+    final_pane_content = capture_pane_content(tmux_target)
+    return final_pane_content is not None and pane_indicates_missing_resume_session(
+        final_pane_content
+    )
+
+
 def run_launch_command_once(
     launch_command: str,
     heartbeat_driver_argv: list[str] | None,
@@ -67,7 +90,8 @@ def run_launch_command_once(
     register_child_pid=None,
     daily_session_rotation: bool = False,
     heartbeat_driver_log_path: str | None = None,
-) -> tuple[float, bool]:
+    is_resume_launch: bool = False,
+) -> tuple[float, bool, bool]:
     start_time = time.time()
     session_start_date = time.strftime("%Y-%m-%d")
     launch_environment = dict(os.environ)
@@ -91,6 +115,8 @@ def run_launch_command_once(
     consecutive_stuck_polls = 0
     previous_pane_content: str | None = None
     was_stuck_kill = False
+    resume_modal_watch_active = is_resume_launch
+    resume_modal_watch_polls = 0
     try:
         while True:
             try:
@@ -127,6 +153,18 @@ def run_launch_command_once(
                 if pane_content is None:
                     consecutive_stuck_polls = 0
                     continue
+                if resume_modal_watch_active:
+                    resume_modal_watch_polls += 1
+                    if (
+                        pane_is_at_idle_repl_prompt(pane_content)
+                        or resume_modal_watch_polls > RESUME_MODAL_WATCH_MAX_POLLS
+                    ):
+                        resume_modal_watch_active = False
+                    elif pane_tail_shows_resume_confirmation_modal(pane_content):
+                        send_enter_key_to_pane(tmux_target)
+                        consecutive_stuck_polls = 0
+                        previous_pane_content = None
+                        continue
                 if pane_poll_is_stuck_evidence(pane_content, previous_pane_content):
                     consecutive_stuck_polls += 1
                 else:
@@ -153,4 +191,7 @@ def run_launch_command_once(
                 driver_process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 driver_process.kill()
-    return time.time() - start_time, was_stuck_kill
+    resume_session_missing = resume_launch_hit_missing_session(
+        is_resume_launch, was_stuck_kill, tmux_target
+    )
+    return time.time() - start_time, was_stuck_kill, resume_session_missing

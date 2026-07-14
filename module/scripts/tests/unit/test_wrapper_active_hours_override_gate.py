@@ -64,7 +64,6 @@ def _stop_on_run(monkeypatch):
     monkeypatch.setattr(
         wrapper, "run_launch_command_once", fake_run_launch_command_once
     )
-    monkeypatch.setattr(wrapper, "should_rotate_session", lambda rotation, date: False)
     monkeypatch.setattr(wrapper.time, "sleep", lambda seconds: None)
 
 
