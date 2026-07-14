@@ -15,7 +15,7 @@ from stuck_indicators import (
 WATCHDOG_POLL_INTERVAL_SECONDS = 30
 WATCHDOG_CONSECUTIVE_STUCK_THRESHOLD = 2
 RESUME_MODAL_WATCH_MAX_POLLS = 5
-RESUME_MODAL_TAIL_LINE_COUNT = 15
+PANE_END_STATE_TAIL_LINE_COUNT = 15
 HEARTBEAT_DRIVER_LOG_SUBDIRECTORY = "heartbeat-driver-logs"
 
 
@@ -67,7 +67,7 @@ def heartbeat_driver_has_given_up(
 
 
 def pane_tail_shows_resume_confirmation_modal(pane_content: str) -> bool:
-    pane_tail = "\n".join(pane_content.splitlines()[-RESUME_MODAL_TAIL_LINE_COUNT:])
+    pane_tail = "\n".join(pane_content.splitlines()[-PANE_END_STATE_TAIL_LINE_COUNT:])
     return pane_indicates_resume_confirmation_modal(pane_tail)
 
 
@@ -77,9 +77,12 @@ def resume_launch_hit_missing_session(
     if not is_resume_launch or was_stuck_kill or tmux_target is None:
         return False
     final_pane_content = capture_pane_content(tmux_target)
-    return final_pane_content is not None and pane_indicates_missing_resume_session(
-        final_pane_content
+    if final_pane_content is None:
+        return False
+    final_pane_tail = "\n".join(
+        final_pane_content.splitlines()[-PANE_END_STATE_TAIL_LINE_COUNT:]
     )
+    return pane_indicates_missing_resume_session(final_pane_tail)
 
 
 def run_launch_command_once(
