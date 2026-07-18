@@ -63,7 +63,9 @@ def _run_supervisor_capturing_resume_flags(monkeypatch, config_file, run_results
         wrapper, "run_launch_command_once", fake_run_launch_command_once
     )
     monkeypatch.setattr(
-        wrapper, "is_within_active_hours", lambda start, end, now=None: True
+        wrapper,
+        "is_within_active_hours",
+        lambda start, end, now=None, active_weekdays_only=False: True,
     )
     monkeypatch.setattr(wrapper.time, "sleep", lambda seconds: None)
 
@@ -99,7 +101,9 @@ def test_supervise_rereads_config_on_each_restart(monkeypatch, tmp_path):
         wrapper, "run_launch_command_once", fake_run_launch_command_once
     )
     monkeypatch.setattr(
-        wrapper, "is_within_active_hours", lambda start, end, now=None: True
+        wrapper,
+        "is_within_active_hours",
+        lambda start, end, now=None, active_weekdays_only=False: True,
     )
     monkeypatch.setattr(wrapper.time, "sleep", lambda seconds: None)
 

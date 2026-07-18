@@ -74,6 +74,11 @@
             default = null;
             description = "Hour (0-23) when agent goes dormant. Null inherits the agent type's default.";
           };
+          activeWeekdaysOnly = lib.mkOption {
+            type = lib.types.nullOr lib.types.bool;
+            default = null;
+            description = "When true the agent stays dormant on Saturday and Sunday, active only Monday-Friday within its active-hours window. Null inherits the agent type's default, then false (runs every day).";
+          };
           dailySessionRotation = lib.mkOption {
             type = lib.types.nullOr lib.types.bool;
             default = null;

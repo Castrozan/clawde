@@ -73,7 +73,9 @@ def test_supervise_runs_outside_hours_when_override_unexpired(monkeypatch, tmp_p
     )
     _stop_on_run(monkeypatch)
     monkeypatch.setattr(
-        wrapper, "is_within_active_hours", lambda start, end, now=None: False
+        wrapper,
+        "is_within_active_hours",
+        lambda start, end, now=None, active_weekdays_only=False: False,
     )
 
     with pytest.raises(_StopSupervising):
@@ -91,7 +93,9 @@ def test_supervise_sleeps_and_clears_override_when_expired(monkeypatch, tmp_path
         raise _StopSupervising()
 
     monkeypatch.setattr(
-        wrapper, "is_within_active_hours", lambda start, end, now=None: False
+        wrapper,
+        "is_within_active_hours",
+        lambda start, end, now=None, active_weekdays_only=False: False,
     )
     monkeypatch.setattr(wrapper.time, "sleep", fake_sleep)
 
@@ -107,7 +111,9 @@ def test_supervise_clears_lingering_override_within_active_hours(monkeypatch, tm
     )
     _stop_on_run(monkeypatch)
     monkeypatch.setattr(
-        wrapper, "is_within_active_hours", lambda start, end, now=None: True
+        wrapper,
+        "is_within_active_hours",
+        lambda start, end, now=None, active_weekdays_only=False: True,
     )
 
     with pytest.raises(_StopSupervising):

@@ -62,6 +62,7 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
         heartbeat_driver_argv = config.get("heartbeat_driver_argv")
         active_hours_start = config.get("active_hours_start")
         active_hours_end = config.get("active_hours_end")
+        active_weekdays_only = config.get("active_weekdays_only", False)
         daily_session_rotation = config.get("daily_session_rotation", False)
         tmux_target = build_tmux_target(config.get("tmux_session"), agent_name)
 
@@ -79,7 +80,7 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
         override_active_until = read_override_active_until(override_file)
         now = datetime.datetime.now()
         within_active_hours = is_within_active_hours(
-            active_hours_start, active_hours_end, now
+            active_hours_start, active_hours_end, now, active_weekdays_only
         )
 
         if override_is_stale(within_active_hours, override_active_until, now):
@@ -143,7 +144,12 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
 
         now_after_run = datetime.datetime.now()
         if not active_hours_gate_allows_run(
-            is_within_active_hours(active_hours_start, active_hours_end, now_after_run),
+            is_within_active_hours(
+                active_hours_start,
+                active_hours_end,
+                now_after_run,
+                active_weekdays_only,
+            ),
             read_override_active_until(override_file),
             now_after_run,
         ):

@@ -74,6 +74,7 @@ let
       if agent.heartbeatInterval != null then buildHeartbeatDriverArgv name agent else null;
     active_hours_start = agent.activeHoursStart;
     active_hours_end = agent.activeHoursEnd;
+    active_weekdays_only = agent.activeWeekdaysOnly;
     daily_session_rotation = agent.dailySessionRotation;
     tmux_session = agent.tmuxSession;
   };

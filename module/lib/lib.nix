@@ -107,6 +107,9 @@ let
       );
       activeHoursStart = firstNonNull agent.activeHoursStart (typeDefault (t: t.defaultActiveHoursStart));
       activeHoursEnd = firstNonNull agent.activeHoursEnd (typeDefault (t: t.defaultActiveHoursEnd));
+      activeWeekdaysOnly = firstNonNull agent.activeWeekdaysOnly (
+        firstNonNull (typeDefault (t: t.defaultActiveWeekdaysOnly)) false
+      );
       denyToolPatterns = (typeList (t: t.defaultDenyToolPatterns)) ++ agent.denyToolPatterns;
       skillDirectories = agent.skillDirectories ++ (typeList (t: t.defaultSkillDirectories));
     };

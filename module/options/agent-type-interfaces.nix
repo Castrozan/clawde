@@ -49,6 +49,11 @@
             default = null;
             description = "Active-hours end inherited unless the instance overrides it.";
           };
+          defaultActiveWeekdaysOnly = lib.mkOption {
+            type = lib.types.nullOr lib.types.bool;
+            default = null;
+            description = "Weekdays-only active gating inherited unless the instance overrides it.";
+          };
           defaultDailySessionRotation = lib.mkOption {
             type = lib.types.nullOr lib.types.bool;
             default = null;

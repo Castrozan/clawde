@@ -78,6 +78,71 @@ def test_seconds_until_active_hours_start_targets_tomorrow_when_start_passed():
     assert sleep_seconds == 10 * 60 * 60
 
 
+def test_is_within_active_hours_ignores_weekday_when_flag_off():
+    saturday_within_hours = datetime.datetime(2026, 7, 18, 12, 0, 0)
+    assert (
+        restart_scheduling.is_within_active_hours(
+            8, 20, now=saturday_within_hours, active_weekdays_only=False
+        )
+        is True
+    )
+
+
+def test_is_within_active_hours_blocks_saturday_when_weekdays_only():
+    saturday_within_hours = datetime.datetime(2026, 7, 18, 12, 0, 0)
+    assert (
+        restart_scheduling.is_within_active_hours(
+            8, 20, now=saturday_within_hours, active_weekdays_only=True
+        )
+        is False
+    )
+
+
+def test_is_within_active_hours_blocks_sunday_when_weekdays_only():
+    sunday_within_hours = datetime.datetime(2026, 7, 19, 12, 0, 0)
+    assert (
+        restart_scheduling.is_within_active_hours(
+            8, 20, now=sunday_within_hours, active_weekdays_only=True
+        )
+        is False
+    )
+
+
+def test_is_within_active_hours_allows_monday_when_weekdays_only():
+    monday_within_hours = datetime.datetime(2026, 7, 20, 12, 0, 0)
+    assert (
+        restart_scheduling.is_within_active_hours(
+            8, 20, now=monday_within_hours, active_weekdays_only=True
+        )
+        is True
+    )
+
+
+def test_is_within_active_hours_weekdays_only_blocks_weekend_even_without_hour_window():
+    saturday = datetime.datetime(2026, 7, 18, 3, 0, 0)
+    monday = datetime.datetime(2026, 7, 20, 3, 0, 0)
+    assert (
+        restart_scheduling.is_within_active_hours(
+            None, None, now=saturday, active_weekdays_only=True
+        )
+        is False
+    )
+    assert (
+        restart_scheduling.is_within_active_hours(
+            None, None, now=monday, active_weekdays_only=True
+        )
+        is True
+    )
+
+
+def test_seconds_until_active_hours_start_none_start_returns_recheck_delay():
+    saturday = datetime.datetime(2026, 7, 18, 3, 0, 0)
+    sleep_seconds = restart_scheduling.seconds_until_active_hours_start(
+        None, now=saturday
+    )
+    assert sleep_seconds == restart_scheduling.WEEKEND_RECHECK_DELAY_SECONDS
+
+
 def test_should_reset_backoff_true_for_long_stable_run():
     assert restart_scheduling.should_reset_backoff(120, was_stuck_kill=False) is True
 

@@ -6,15 +6,21 @@ MAXIMUM_RESTART_DELAY_SECONDS = 300
 STABLE_RUNTIME_THRESHOLD_SECONDS = 60
 
 
+WEEKEND_RECHECK_DELAY_SECONDS = 60 * 60
+
+
 def is_within_active_hours(
     active_hours_start: int | None,
     active_hours_end: int | None,
     now: datetime.datetime | None = None,
+    active_weekdays_only: bool = False,
 ) -> bool:
-    if active_hours_start is None:
-        return True
     if now is None:
         now = datetime.datetime.now()
+    if active_weekdays_only and now.isoweekday() >= 6:
+        return False
+    if active_hours_start is None:
+        return True
     current_hour = now.hour
     if active_hours_start <= active_hours_end:
         return active_hours_start <= current_hour < active_hours_end
@@ -22,11 +28,13 @@ def is_within_active_hours(
 
 
 def seconds_until_active_hours_start(
-    active_hours_start: int,
+    active_hours_start: int | None,
     now: datetime.datetime | None = None,
 ) -> int:
     if now is None:
         now = datetime.datetime.now()
+    if active_hours_start is None:
+        return WEEKEND_RECHECK_DELAY_SECONDS
     target = now.replace(hour=active_hours_start, minute=0, second=0, microsecond=0)
     if target <= now and now.hour != active_hours_start:
         target += datetime.timedelta(days=1)
