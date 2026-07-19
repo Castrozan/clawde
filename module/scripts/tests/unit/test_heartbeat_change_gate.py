@@ -73,3 +73,31 @@ def test_runs_real_probe_command_and_exits_on_change(monkeypatch, tmp_path):
     assert change_gate.gate_fires("printf actionable", state_file) is True
     assert change_gate.gate_fires("printf actionable", state_file) is False
     assert change_gate.gate_fires("true", state_file) is False
+
+
+def test_fire_while_pending_refires_an_unchanged_actionable_state(tmp_path):
+    state_file = tmp_path / "steward"
+
+    assert (
+        change_gate.gate_fires("echo pending", state_file, fire_while_pending=True)
+        is True
+    )
+    assert (
+        change_gate.gate_fires("echo pending", state_file, fire_while_pending=True)
+        is True
+    )
+
+
+def test_fire_while_pending_still_skips_when_nothing_is_actionable(tmp_path):
+    state_file = tmp_path / "steward"
+    change_gate.store_fingerprint(state_file, "pending")
+
+    assert change_gate.gate_fires("true", state_file, fire_while_pending=True) is False
+    assert not state_file.exists()
+
+
+def test_edge_mode_remains_the_default_and_does_not_refire(tmp_path):
+    state_file = tmp_path / "steward"
+
+    assert change_gate.gate_fires("echo pending", state_file) is True
+    assert change_gate.gate_fires("echo pending", state_file) is False

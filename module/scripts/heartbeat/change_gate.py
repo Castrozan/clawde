@@ -37,12 +37,14 @@ def forget_fingerprint(state_file: Path) -> None:
     state_file.unlink(missing_ok=True)
 
 
-def gate_fires(probe_command: str, state_file: Path) -> bool:
+def gate_fires(
+    probe_command: str, state_file: Path, fire_while_pending: bool = False
+) -> bool:
     return_code, fingerprint = run_probe(probe_command)
     if return_code != 0 or not fingerprint:
         forget_fingerprint(state_file)
         return False
-    if fingerprint == read_stored_fingerprint(state_file):
+    if not fire_while_pending and fingerprint == read_stored_fingerprint(state_file):
         return False
     store_fingerprint(state_file, fingerprint)
     return True
@@ -72,6 +74,16 @@ def parse_arguments() -> argparse.Namespace:
         "when the agent has no reason to wake.",
     )
     parser.add_argument(
+        "--fire-while-pending",
+        action="store_true",
+        help="Treat a non-empty probe fingerprint as a level rather than an edge: fire "
+        "on every tick while the agent reports something actionable, instead of only "
+        "when the fingerprint changes. Use this when the agent's work can outlive one "
+        "tick, because the fingerprint is stored the moment the gate fires rather than "
+        "when the work completes, so a cycle that dies mid-task leaves an unchanged "
+        "state that an edge-triggered gate never surfaces again.",
+    )
+    parser.add_argument(
         "--state-file",
         default=None,
         help="Override the fingerprint store path. Defaults to a per-label file under "
@@ -87,7 +99,11 @@ def main() -> int:
         if arguments.state_file
         else default_state_file(arguments.label)
     )
-    return 0 if gate_fires(arguments.probe, state_file) else 1
+    return (
+        0
+        if gate_fires(arguments.probe, state_file, arguments.fire_while_pending)
+        else 1
+    )
 
 
 if __name__ == "__main__":
