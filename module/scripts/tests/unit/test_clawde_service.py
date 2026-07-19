@@ -57,7 +57,11 @@ def test_reconcile_recreates_a_session_that_died_after_startup(monkeypatch):
         ]
     }
 
-    service_module.ensure_all_agent_windows(backend, specification)
+    service_module.ensure_all_agent_windows(
+        backend,
+        specification,
+        service_module.launch_gate_decision.LaunchGateScheduler(),
+    )
 
     assert issued_new_session_names == ["clawde"], (
         "reconcile must recreate the dead 'clawde' session and only it"
@@ -86,7 +90,11 @@ def test_each_newly_created_agent_window_is_staggered(monkeypatch):
         ]
     }
 
-    service_module.ensure_all_agent_windows(backend, specification)
+    service_module.ensure_all_agent_windows(
+        backend,
+        specification,
+        service_module.launch_gate_decision.LaunchGateScheduler(),
+    )
 
     assert stagger_sleeps == [service_module.AGENT_STARTUP_STAGGER_SECONDS] * 4, (
         "every newly created agent window must be staggered so the agents do not "
@@ -131,7 +139,11 @@ def test_steady_state_reconcile_does_not_relaunch_running_agents(monkeypatch):
         ]
     }
 
-    service_module.ensure_all_agent_windows(backend, specification)
+    service_module.ensure_all_agent_windows(
+        backend,
+        specification,
+        service_module.launch_gate_decision.LaunchGateScheduler(),
+    )
 
     assert stagger_sleeps == [], (
         "a reconcile pass where every declared agent already has a running wrapper "
@@ -144,7 +156,7 @@ def test_supervisor_reconciles_every_tick_instead_of_only_checking_existence(
 ):
     reconcile_invocation_count = {"value": 0}
 
-    def fake_ensure_all_agent_windows(_backend, _specification):
+    def fake_ensure_all_agent_windows(_backend, _specification, _launch_gate_scheduler):
         reconcile_invocation_count["value"] += 1
 
     monkeypatch.setattr(

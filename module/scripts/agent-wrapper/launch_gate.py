@@ -10,16 +10,6 @@ from session_watchdog import (
 MAXIMUM_TRIGGERED_LAUNCH_RUNTIME_SECONDS = 3600
 
 
-def launch_gate_fires(launch_gate_command: str | None) -> bool:
-    if not launch_gate_command:
-        return True
-    completed_process = subprocess.run(
-        ["bash", "-c", launch_gate_command],
-        stdin=subprocess.DEVNULL,
-    )
-    return completed_process.returncode == 0
-
-
 def run_launch_command_to_completion(
     launch_command: str,
     tmux_target: str | None,

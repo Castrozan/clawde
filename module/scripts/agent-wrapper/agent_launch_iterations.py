@@ -5,10 +5,7 @@ from active_hours_override import (
     active_hours_gate_allows_run,
     read_override_active_until,
 )
-from launch_gate import (
-    launch_gate_fires,
-    run_launch_command_to_completion,
-)
+from launch_gate import run_launch_command_to_completion
 from launch_session import decide_and_persist_launch_session
 from redeploy_signals import register_current_child_process_id
 from restart_scheduling import (
@@ -34,13 +31,7 @@ def run_triggered_launch_iteration(
     tmux_target: str | None,
     runtime_root_directory: str,
     daily_session_rotation: bool,
-    launch_gate_command: str | None,
-    launch_gate_interval_seconds: int,
 ) -> None:
-    if not launch_gate_fires(launch_gate_command):
-        time.sleep(launch_gate_interval_seconds)
-        return
-
     launch_session = decide_and_persist_launch_session(
         runtime_root_directory,
         agent_name,
@@ -66,10 +57,8 @@ def run_triggered_launch_iteration(
     emit_timestamped_log(
         agent_name,
         f"completed a triggered launch after {int(triggered_runtime_seconds)} "
-        f"seconds. Sleeping {launch_gate_interval_seconds}s until the next "
-        "trigger check...",
+        "seconds. Exiting until the supervisor's launch gate fires again.",
     )
-    time.sleep(launch_gate_interval_seconds)
 
 
 def run_warm_session_iteration(

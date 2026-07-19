@@ -38,35 +38,19 @@ def _patch_common(monkeypatch, resume_session_missing=False):
     return launches, slept
 
 
-def test_triggered_iteration_launches_once_when_the_gate_fires(monkeypatch):
+def test_triggered_iteration_launches_once_and_never_sleeps(monkeypatch):
     launches, slept = _patch_common(monkeypatch)
-    monkeypatch.setattr(agent_launch_iterations, "launch_gate_fires", lambda _cmd: True)
 
     agent_launch_iterations.run_triggered_launch_iteration(
-        "steward", "claude --print x", None, "/root", False, "probe", 900
+        "steward", "claude --print x", None, "/root", False
     )
 
     assert launches == ["claude --print x"]
-    assert slept == [900]
-
-
-def test_triggered_iteration_skips_the_launch_when_the_gate_does_not_fire(monkeypatch):
-    launches, slept = _patch_common(monkeypatch)
-    monkeypatch.setattr(
-        agent_launch_iterations, "launch_gate_fires", lambda _cmd: False
-    )
-
-    agent_launch_iterations.run_triggered_launch_iteration(
-        "steward", "claude --print x", None, "/root", False, "probe", 900
-    )
-
-    assert launches == []
-    assert slept == [900]
+    assert slept == []
 
 
 def test_triggered_iteration_drops_a_missing_resume_session(monkeypatch):
     _launches, _slept = _patch_common(monkeypatch, resume_session_missing=True)
-    monkeypatch.setattr(agent_launch_iterations, "launch_gate_fires", lambda _cmd: True)
     cleared_records = []
     monkeypatch.setattr(
         agent_launch_iterations,
@@ -75,7 +59,7 @@ def test_triggered_iteration_drops_a_missing_resume_session(monkeypatch):
     )
 
     agent_launch_iterations.run_triggered_launch_iteration(
-        "steward", "claude --print x", None, "/root", False, "probe", 900
+        "steward", "claude --print x", None, "/root", False
     )
 
     assert cleared_records == ["/tmp/steward-session.json"]

@@ -68,7 +68,9 @@ def test_skips_creation_when_wrapper_already_runs_in_a_renamed_window(monkeypatc
     )
 
     service_module.ensure_all_agent_windows(
-        backend, _single_session_specification(["alpha-pm", "bronze", "steward"])
+        backend,
+        _single_session_specification(["alpha-pm", "bronze", "steward"]),
+        service_module.launch_gate_decision.LaunchGateScheduler(),
     )
 
     assert "steward" not in issued_new_windows, (
@@ -91,7 +93,9 @@ def test_terminates_extra_duplicate_wrappers_keeping_the_oldest(monkeypatch):
     )
 
     service_module.ensure_all_agent_windows(
-        backend, _single_session_specification(["steward"])
+        backend,
+        _single_session_specification(["steward"]),
+        service_module.launch_gate_decision.LaunchGateScheduler(),
     )
 
     assert terminated_process_ids == [6552], (
@@ -111,7 +115,9 @@ def test_terminates_orphan_wrapper_whose_agent_is_not_in_the_spec(monkeypatch):
     )
 
     service_module.ensure_all_agent_windows(
-        backend, _single_session_specification(["steward"])
+        backend,
+        _single_session_specification(["steward"]),
+        service_module.launch_gate_decision.LaunchGateScheduler(),
     )
 
     assert terminated_process_ids == [333], (
@@ -131,7 +137,9 @@ def test_creates_window_when_no_wrapper_is_running(monkeypatch):
     )
 
     service_module.ensure_all_agent_windows(
-        backend, _single_session_specification(["steward"])
+        backend,
+        _single_session_specification(["steward"]),
+        service_module.launch_gate_decision.LaunchGateScheduler(),
     )
 
     assert issued_new_windows == ["steward"]

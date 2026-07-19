@@ -60,7 +60,6 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
         active_hours_end = config.get("active_hours_end")
         active_weekdays_only = config.get("active_weekdays_only", False)
         daily_session_rotation = config.get("daily_session_rotation", False)
-        launch_gate_command = config.get("launch_gate_command")
         launch_gate_interval_seconds = config.get("launch_gate_interval_seconds")
         tmux_target = build_tmux_target(config.get("tmux_session"), agent_name)
 
@@ -112,10 +111,8 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
                 tmux_target,
                 runtime_root_directory,
                 daily_session_rotation,
-                launch_gate_command,
-                launch_gate_interval_seconds,
             )
-            continue
+            return
 
         restart_delay_seconds = run_warm_session_iteration(
             agent_name,

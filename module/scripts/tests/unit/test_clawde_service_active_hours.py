@@ -61,6 +61,24 @@ def _patch_reconcile(monkeypatch, agent_names_with_running_wrapper, recorded_set
         "agent_names_with_running_wrapper_after_reconcile",
         fake_reconcile,
     )
+    monkeypatch.setattr(
+        service_module.agent_wrapper_reconcile,
+        "agent_names_with_live_wrapper",
+        lambda session_name: set(agent_names_with_running_wrapper),
+    )
+    monkeypatch.setattr(
+        service_module.launch_gate_decision,
+        "agent_launches_on_trigger",
+        lambda agent_name: False,
+    )
+
+
+def _run_session(backend, session_specification):
+    service_module.ensure_agent_windows_for_session(
+        backend,
+        session_specification,
+        service_module.launch_gate_decision.LaunchGateScheduler(),
+    )
 
 
 def test_off_hours_agent_window_is_removed_and_not_spawned(monkeypatch):
@@ -70,9 +88,7 @@ def test_off_hours_agent_window_is_removed_and_not_spawned(monkeypatch):
     )
     backend = RecordingBackend()
 
-    service_module.ensure_agent_windows_for_session(
-        backend, _session_specification(["steward", "betha-pm"])
-    )
+    _run_session(backend, _session_specification(["steward", "betha-pm"]))
 
     assert backend.removed_windows == ["betha-pm"]
     assert backend.ensured_windows == ["steward"]
@@ -88,9 +104,7 @@ def test_reconcile_is_scoped_to_agents_that_should_be_running(monkeypatch):
     )
     backend = RecordingBackend()
 
-    service_module.ensure_agent_windows_for_session(
-        backend, _session_specification(["steward", "betha-pm"])
-    )
+    _run_session(backend, _session_specification(["steward", "betha-pm"]))
 
     assert recorded_sets == [{"steward"}]
     assert backend.removed_windows == ["betha-pm"]
@@ -105,9 +119,7 @@ def test_active_agent_with_running_wrapper_is_not_respawned(monkeypatch):
     )
     backend = RecordingBackend()
 
-    service_module.ensure_agent_windows_for_session(
-        backend, _session_specification(["steward", "betha-pm"])
-    )
+    _run_session(backend, _session_specification(["steward", "betha-pm"]))
 
     assert backend.ensured_windows == []
     assert backend.removed_windows == []
@@ -120,9 +132,7 @@ def test_active_agent_without_a_wrapper_is_spawned(monkeypatch):
     )
     backend = RecordingBackend()
 
-    service_module.ensure_agent_windows_for_session(
-        backend, _session_specification(["steward"])
-    )
+    _run_session(backend, _session_specification(["steward"]))
 
     assert backend.ensured_windows == ["steward"]
 

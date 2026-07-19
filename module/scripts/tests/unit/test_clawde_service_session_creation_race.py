@@ -44,7 +44,11 @@ def test_session_creation_tolerates_a_concurrent_creator_without_crashing(monkey
         ]
     }
 
-    service_module.ensure_all_agent_windows(backend, specification)
+    service_module.ensure_all_agent_windows(
+        backend,
+        specification,
+        service_module.launch_gate_decision.LaunchGateScheduler(),
+    )
 
     assert [command for command in issued_commands if command[0] == "new-window"] == [
         ("new-window", "-t", "clawde", "-n", "betha-pm", "true")

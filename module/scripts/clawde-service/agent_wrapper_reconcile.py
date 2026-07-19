@@ -142,6 +142,14 @@ def rename_windows_to_match_running_wrapper_identity(
         rename_window(window_pane["window_id"], agent_name)
 
 
+def agent_names_with_live_wrapper(session_name: str) -> set:
+    return set(
+        group_wrapper_process_ids_by_agent_name(
+            find_session_agent_wrapper_processes(session_name)
+        )
+    )
+
+
 def agent_names_with_running_wrapper_after_reconcile(
     session_name: str, declared_agent_names: set
 ) -> set:

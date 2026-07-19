@@ -4,6 +4,7 @@ import time
 
 import active_hours_decision
 import agent_wrapper_reconcile
+import launch_gate_decision
 from supervisor_backend_base import (
     SupervisorMultiplexerBackend,
     select_supervisor_backend,
@@ -13,17 +14,40 @@ SUPERVISOR_POLL_INTERVAL_SECONDS = 10
 AGENT_STARTUP_STAGGER_SECONDS = 2
 
 
+def agent_should_be_running(
+    agent_name: str,
+    agent_has_a_live_wrapper: bool,
+    launch_gate_scheduler: launch_gate_decision.LaunchGateScheduler,
+) -> bool:
+    if not active_hours_decision.agent_should_run_now(agent_name):
+        return False
+    if not launch_gate_decision.agent_launches_on_trigger(agent_name):
+        return True
+    if agent_has_a_live_wrapper:
+        return True
+    return launch_gate_scheduler.launch_is_pending(agent_name)
+
+
 def ensure_agent_windows_for_session(
-    backend: SupervisorMultiplexerBackend, session_specification: dict
+    backend: SupervisorMultiplexerBackend,
+    session_specification: dict,
+    launch_gate_scheduler: launch_gate_decision.LaunchGateScheduler,
 ) -> None:
     session_name = session_specification["name"]
 
     bootstrap_scaffolding_created = backend.ensure_host_ready(session_name)
 
+    agent_names_with_a_live_wrapper = (
+        agent_wrapper_reconcile.agent_names_with_live_wrapper(session_name)
+    )
     agent_names_that_should_be_running = {
         agent_specification["name"]
         for agent_specification in session_specification["agents"]
-        if active_hours_decision.agent_should_run_now(agent_specification["name"])
+        if agent_should_be_running(
+            agent_specification["name"],
+            agent_specification["name"] in agent_names_with_a_live_wrapper,
+            launch_gate_scheduler,
+        )
     }
     agent_names_with_a_running_wrapper = (
         agent_wrapper_reconcile.agent_names_with_running_wrapper_after_reconcile(
@@ -37,6 +61,7 @@ def ensure_agent_windows_for_session(
             backend.remove_agent_window(session_name, agent_name)
             continue
         if agent_name in agent_names_with_a_running_wrapper:
+            launch_gate_scheduler.consume_pending_launch(agent_name)
             continue
         agent_window_was_created = backend.ensure_agent_window(
             session_name,
@@ -51,10 +76,14 @@ def ensure_agent_windows_for_session(
 
 
 def ensure_all_agent_windows(
-    backend: SupervisorMultiplexerBackend, specification: dict
+    backend: SupervisorMultiplexerBackend,
+    specification: dict,
+    launch_gate_scheduler: launch_gate_decision.LaunchGateScheduler,
 ) -> None:
     for session_specification in specification["sessions"]:
-        ensure_agent_windows_for_session(backend, session_specification)
+        ensure_agent_windows_for_session(
+            backend, session_specification, launch_gate_scheduler
+        )
 
 
 def reconcile_sessions_forever(
@@ -62,8 +91,9 @@ def reconcile_sessions_forever(
     poll_interval_seconds: int = SUPERVISOR_POLL_INTERVAL_SECONDS,
 ) -> None:
     backend = select_supervisor_backend()
+    launch_gate_scheduler = launch_gate_decision.LaunchGateScheduler()
     while True:
-        ensure_all_agent_windows(backend, specification)
+        ensure_all_agent_windows(backend, specification, launch_gate_scheduler)
         time.sleep(poll_interval_seconds)
 
 
