@@ -5,11 +5,15 @@ import sys
 SERVICE_DIRECTORY = (
     pathlib.Path(__file__).resolve().parent.parent.parent / "clawde-service"
 )
+AGENT_WRAPPER_DIRECTORY = (
+    pathlib.Path(__file__).resolve().parent.parent.parent / "agent-wrapper"
+)
 
 
 def _ensure_service_directory_on_path():
-    if str(SERVICE_DIRECTORY) not in sys.path:
-        sys.path.insert(0, str(SERVICE_DIRECTORY))
+    for scripts_directory in (AGENT_WRAPPER_DIRECTORY, SERVICE_DIRECTORY):
+        if str(scripts_directory) not in sys.path:
+            sys.path.insert(0, str(scripts_directory))
 
 
 def load_service_module():

@@ -25,6 +25,9 @@ class SupervisorMultiplexerBackend:
     def remove_bootstrap_scaffolding(self, session_name: str) -> None:
         raise NotImplementedError
 
+    def remove_agent_window(self, session_name: str, agent_name: str) -> None:
+        raise NotImplementedError
+
     def ensure_agent_window(
         self, session_name: str, agent_name: str, wrapper_command: str
     ) -> bool:

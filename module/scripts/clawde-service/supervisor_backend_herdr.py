@@ -142,3 +142,9 @@ class HerdrSupervisorBackend(HerdrQueryOperations, SupervisorMultiplexerBackend)
         if bootstrap_tab is None:
             return
         self.run_herdr_command("tab", "close", bootstrap_tab["tab_id"])
+
+    def remove_agent_window(self, session_name: str, agent_name: str) -> None:
+        tab = self.find_agent_tab(session_name, agent_name)
+        if tab is None:
+            return
+        self.run_herdr_command("tab", "close", tab["tab_id"])

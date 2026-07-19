@@ -2,6 +2,7 @@ import argparse
 import json
 import time
 
+import active_hours_decision
 import agent_wrapper_reconcile
 from supervisor_backend_base import (
     SupervisorMultiplexerBackend,
@@ -19,22 +20,27 @@ def ensure_agent_windows_for_session(
 
     bootstrap_scaffolding_created = backend.ensure_host_ready(session_name)
 
-    declared_agent_names = {
+    agent_names_that_should_be_running = {
         agent_specification["name"]
         for agent_specification in session_specification["agents"]
+        if active_hours_decision.agent_should_run_now(agent_specification["name"])
     }
     agent_names_with_a_running_wrapper = (
         agent_wrapper_reconcile.agent_names_with_running_wrapper_after_reconcile(
-            session_name, declared_agent_names
+            session_name, agent_names_that_should_be_running
         )
     )
 
     for agent_specification in session_specification["agents"]:
-        if agent_specification["name"] in agent_names_with_a_running_wrapper:
+        agent_name = agent_specification["name"]
+        if agent_name not in agent_names_that_should_be_running:
+            backend.remove_agent_window(session_name, agent_name)
+            continue
+        if agent_name in agent_names_with_a_running_wrapper:
             continue
         agent_window_was_created = backend.ensure_agent_window(
             session_name,
-            agent_specification["name"],
+            agent_name,
             agent_specification["wrapper_command"],
         )
         if agent_window_was_created:

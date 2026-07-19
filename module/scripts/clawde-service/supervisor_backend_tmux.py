@@ -86,3 +86,6 @@ class TmuxSupervisorBackend(SupervisorMultiplexerBackend):
         self.run_tmux_command(
             "kill-window", "-t", f"{session_name}:{BOOTSTRAP_PLACEHOLDER_WINDOW_NAME}"
         )
+
+    def remove_agent_window(self, session_name: str, agent_name: str) -> None:
+        self.run_tmux_command("kill-window", "-t", f"{session_name}:{agent_name}")

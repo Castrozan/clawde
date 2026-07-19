@@ -117,6 +117,36 @@ def test_relaunch_runs_wrapper_in_existing_workspace_scoped_tab_pane():
     ) in issued
 
 
+def test_remove_agent_window_closes_the_agent_tab():
+    issued = []
+    backend = backend_with_responses(
+        issued,
+        [
+            (("workspace", "list"), WORKSPACE_LIST_WITH_CLAWDE),
+            (("tab", "list", "--workspace"), TAB_LIST_WP),
+        ],
+    )
+
+    backend.remove_agent_window("clawde", "bronze")
+
+    assert ("tab", "close", "wP:t7") in issued
+
+
+def test_remove_agent_window_is_a_noop_when_the_tab_is_absent():
+    issued = []
+    backend = backend_with_responses(
+        issued,
+        [
+            (("workspace", "list"), WORKSPACE_LIST_WITH_CLAWDE),
+            (("tab", "list", "--workspace"), TAB_LIST_WP_ONLY_BOOTSTRAP),
+        ],
+    )
+
+    backend.remove_agent_window("clawde", "bronze")
+
+    assert not any(command[:2] == ("tab", "close") for command in issued)
+
+
 def test_select_supervisor_backend_dispatches_on_environment(monkeypatch):
     monkeypatch.setenv(base.MULTIPLEXER_ENVIRONMENT_VARIABLE, "herdr")
     assert isinstance(

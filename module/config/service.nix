@@ -78,6 +78,7 @@ let
         "TMUX_TMPDIR=%t"
         "XDG_RUNTIME_DIR=%t"
         "CLAWDE_MULTIPLEXER=${config.clawde.multiplexer}"
+        "PYTHONPATH=${../scripts/agent-wrapper}"
       ];
     };
     Install = {
@@ -96,6 +97,7 @@ let
         PATH = clawdeRuntimePaths;
         HOME = homeDir;
         CLAWDE_MULTIPLEXER = config.clawde.multiplexer;
+        PYTHONPATH = "${../scripts/agent-wrapper}";
       };
       StandardOutPath = "${homeDir}/Library/Logs/clawde.out.log";
       StandardErrorPath = "${homeDir}/Library/Logs/clawde.err.log";
