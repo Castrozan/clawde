@@ -21,6 +21,7 @@ def _load_wrapper_module():
 
 
 wrapper = _load_wrapper_module()
+agent_launch_iterations = sys.modules["agent_launch_iterations"]
 
 
 class _StopSupervising(Exception):
@@ -60,7 +61,9 @@ def _run_supervisor_capturing_resume_flags(monkeypatch, config_file, run_results
         raise _StopSupervising()
 
     monkeypatch.setattr(
-        wrapper, "run_launch_command_once", fake_run_launch_command_once
+        agent_launch_iterations,
+        "run_launch_command_once",
+        fake_run_launch_command_once,
     )
     monkeypatch.setattr(
         wrapper,
@@ -98,7 +101,9 @@ def test_supervise_rereads_config_on_each_restart(monkeypatch, tmp_path):
         raise _StopSupervising()
 
     monkeypatch.setattr(
-        wrapper, "run_launch_command_once", fake_run_launch_command_once
+        agent_launch_iterations,
+        "run_launch_command_once",
+        fake_run_launch_command_once,
     )
     monkeypatch.setattr(
         wrapper,

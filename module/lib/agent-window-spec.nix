@@ -46,8 +46,9 @@ let
       mcpConfigFlag = lib.optionalString (
         agent.mcpConfigFile != null
       ) "--strict-mcp-config --mcp-config ${agent.mcpConfigFile} ";
+      runOncePrintFlag = lib.optionalString agent.launchOnTrigger "--print ${lib.escapeShellArg agent.heartbeatPrompt} ";
     in
-    "cd ${workspace} && ${environmentSetter}${claudeResolvedFromAgentRuntimePathForRebuildStability} \${CLAWDE_RESUME_FLAG:-} ${channelFlag} ${modelFlag} ${nameFlag} ${permissionModeFlag} ${mcpConfigFlag}${appendSystemPromptFlag} ${skillDirFlags}";
+    "cd ${workspace} && ${environmentSetter}${claudeResolvedFromAgentRuntimePathForRebuildStability} ${runOncePrintFlag}\${CLAWDE_RESUME_FLAG:-} ${channelFlag} ${modelFlag} ${nameFlag} ${permissionModeFlag} ${mcpConfigFlag}${appendSystemPromptFlag} ${skillDirFlags}";
 
   buildHeartbeatDriverArgv =
     name: agent:
@@ -71,7 +72,13 @@ let
   buildAgentLaunchConfig = name: agent: {
     launch_command = buildAgentLaunchCommand name agent;
     heartbeat_driver_argv =
-      if agent.heartbeatInterval != null then buildHeartbeatDriverArgv name agent else null;
+      if (!agent.launchOnTrigger && agent.heartbeatInterval != null) then
+        buildHeartbeatDriverArgv name agent
+      else
+        null;
+    launch_gate_command = if agent.launchOnTrigger then agent.heartbeatGateCommand else null;
+    launch_gate_interval_seconds =
+      if agent.launchOnTrigger then agent.launchGateIntervalSeconds else null;
     active_hours_start = agent.activeHoursStart;
     active_hours_end = agent.activeHoursEnd;
     active_weekdays_only = agent.activeWeekdaysOnly;

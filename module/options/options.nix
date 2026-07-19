@@ -84,6 +84,16 @@
             default = null;
             description = "Kill and restart the Claude process once per day to prevent context accumulation. Null inherits the agent type's default, then false.";
           };
+          launchOnTrigger = lib.mkOption {
+            type = lib.types.nullOr lib.types.bool;
+            default = null;
+            description = "When true the agent keeps no warm session: instead of a persistent Claude process prodded by the heartbeat driver, the wrapper evaluates the heartbeat gate command on an interval and launches a single run-once `claude --print` cycle only when the gate fires, then goes dormant until the next trigger. Reuses heartbeatGateCommand as the launch gate and heartbeatPrompt as the run-once prompt. Null inherits the agent type's default, then false.";
+          };
+          launchGateIntervalSeconds = lib.mkOption {
+            type = lib.types.nullOr lib.types.int;
+            default = null;
+            description = "Seconds between launch-gate checks when launchOnTrigger is set. Null inherits the agent type's default, then 900.";
+          };
           expose = lib.mkOption {
             type = lib.types.submodule {
               options = {

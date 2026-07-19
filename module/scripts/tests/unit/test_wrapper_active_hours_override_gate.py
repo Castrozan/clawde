@@ -21,6 +21,7 @@ def _load_wrapper_module():
 
 
 wrapper = _load_wrapper_module()
+agent_launch_iterations = sys.modules["agent_launch_iterations"]
 
 
 class _StopSupervising(Exception):
@@ -62,7 +63,9 @@ def _stop_on_run(monkeypatch):
         raise _StopSupervising()
 
     monkeypatch.setattr(
-        wrapper, "run_launch_command_once", fake_run_launch_command_once
+        agent_launch_iterations,
+        "run_launch_command_once",
+        fake_run_launch_command_once,
     )
     monkeypatch.setattr(wrapper.time, "sleep", lambda seconds: None)
 

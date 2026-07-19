@@ -59,6 +59,16 @@
             default = null;
             description = "Daily session rotation inherited unless the instance overrides it.";
           };
+          defaultLaunchOnTrigger = lib.mkOption {
+            type = lib.types.nullOr lib.types.bool;
+            default = null;
+            description = "Launch-on-trigger mode inherited unless the instance overrides it.";
+          };
+          defaultLaunchGateIntervalSeconds = lib.mkOption {
+            type = lib.types.nullOr lib.types.int;
+            default = null;
+            description = "Launch-gate check interval (seconds) inherited unless the instance overrides it.";
+          };
           defaultDenyToolPatterns = lib.mkOption {
             type = lib.types.listOf lib.types.str;
             default = [ ];

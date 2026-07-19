@@ -97,6 +97,12 @@ let
       dailySessionRotation = firstNonNull agent.dailySessionRotation (
         firstNonNull (typeDefault (t: t.defaultDailySessionRotation)) false
       );
+      launchOnTrigger = firstNonNull agent.launchOnTrigger (
+        firstNonNull (typeDefault (t: t.defaultLaunchOnTrigger)) false
+      );
+      launchGateIntervalSeconds = firstNonNull agent.launchGateIntervalSeconds (
+        firstNonNull (typeDefault (t: t.defaultLaunchGateIntervalSeconds)) 900
+      );
       personality = firstNonNull agent.personality typePersonality;
       heartbeatInterval = firstNonNull agent.heartbeatInterval (
         typeDefault (t: t.defaultHeartbeatInterval)

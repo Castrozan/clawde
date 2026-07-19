@@ -28,6 +28,7 @@ in
         defaultModel = "opus";
         defaultPermissionMode = "bypassPermissions";
         defaultDailySessionRotation = true;
+        defaultLaunchOnTrigger = true;
         defaultHeartbeatInterval = "*/15 * * * *";
         defaultHeartbeatPrompt = builtins.readFile ./payload/heartbeat-prompt.md;
         defaultHeartbeatGateCommand = "clawde-heartbeat-change-gate --label steward --probe steward-heartbeat-probe";

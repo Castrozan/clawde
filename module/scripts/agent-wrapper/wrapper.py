@@ -11,24 +11,20 @@ from active_hours_override import (
     read_override_active_until,
     runtime_root_directory_from_launch_config_path,
 )
+from agent_launch_iterations import (
+    run_triggered_launch_iteration,
+    run_warm_session_iteration,
+)
 from redeploy_signals import (
     install_exit_signal_handlers,
     install_redeploy_signal_handler,
-    register_current_child_process_id,
 )
-from launch_session import decide_and_persist_launch_session
-from session_store import clear_persisted_session_record
 from restart_scheduling import (
     INITIAL_RESTART_DELAY_SECONDS,
-    MAXIMUM_RESTART_DELAY_SECONDS,
     is_within_active_hours,
     seconds_until_active_hours_start,
-    should_reset_backoff,
 )
-from session_watchdog import (
-    heartbeat_driver_log_path_for_agent,
-    run_launch_command_once,
-)
+from session_watchdog import heartbeat_driver_log_path_for_agent
 
 
 def build_tmux_target(tmux_session: str | None, agent_name: str) -> str | None:
@@ -64,6 +60,8 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
         active_hours_end = config.get("active_hours_end")
         active_weekdays_only = config.get("active_weekdays_only", False)
         daily_session_rotation = config.get("daily_session_rotation", False)
+        launch_gate_command = config.get("launch_gate_command")
+        launch_gate_interval_seconds = config.get("launch_gate_interval_seconds")
         tmux_target = build_tmux_target(config.get("tmux_session"), agent_name)
 
         runtime_root_directory = runtime_root_directory_from_launch_config_path(
@@ -107,67 +105,31 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
                 flush=True,
             )
 
-        launch_session = decide_and_persist_launch_session(
-            runtime_root_directory,
-            agent_name,
-            daily_session_rotation,
-        )
-        if launch_session.rotating_session:
-            print(
-                f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
-                f"Agent {agent_name} daily session rotation. Starting fresh.",
-                flush=True,
-            )
-
-        runtime_seconds, was_stuck_kill, resume_session_missing = (
-            run_launch_command_once(
+        if launch_gate_interval_seconds is not None:
+            run_triggered_launch_iteration(
+                agent_name,
                 launch_command,
-                heartbeat_driver_argv,
                 tmux_target,
-                resume_flag=launch_session.resume_flag,
-                register_child_pid=register_current_child_process_id,
-                daily_session_rotation=daily_session_rotation,
-                heartbeat_driver_log_path=heartbeat_driver_log_path,
-                is_resume_launch=launch_session.resume_previous_session,
+                runtime_root_directory,
+                daily_session_rotation,
+                launch_gate_command,
+                launch_gate_interval_seconds,
             )
-        )
-
-        if resume_session_missing:
-            print(
-                f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
-                f"Agent {agent_name} could not resume its pinned session "
-                "(no conversation found); dropping the stale session so the next "
-                "launch starts a fresh one.",
-                flush=True,
-            )
-            clear_persisted_session_record(launch_session.session_record_file_path)
-
-        now_after_run = datetime.datetime.now()
-        if not active_hours_gate_allows_run(
-            is_within_active_hours(
-                active_hours_start,
-                active_hours_end,
-                now_after_run,
-                active_weekdays_only,
-            ),
-            read_override_active_until(override_file),
-            now_after_run,
-        ):
             continue
 
-        if should_reset_backoff(runtime_seconds, was_stuck_kill):
-            restart_delay_seconds = INITIAL_RESTART_DELAY_SECONDS
-
-        print(
-            f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
-            f"Agent {agent_name} exited after {int(runtime_seconds)} seconds. "
-            f"Restarting in {restart_delay_seconds} seconds...",
-            flush=True,
-        )
-        time.sleep(restart_delay_seconds)
-
-        restart_delay_seconds = min(
-            restart_delay_seconds * 2, MAXIMUM_RESTART_DELAY_SECONDS
+        restart_delay_seconds = run_warm_session_iteration(
+            agent_name,
+            launch_command,
+            heartbeat_driver_argv,
+            tmux_target,
+            runtime_root_directory,
+            daily_session_rotation,
+            override_file,
+            active_hours_start,
+            active_hours_end,
+            active_weekdays_only,
+            heartbeat_driver_log_path,
+            restart_delay_seconds,
         )
 
 
