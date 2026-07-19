@@ -53,8 +53,8 @@ def pin_can_be_advanced_safely(report: dict) -> bool:
     return (
         report["ahead_of_pinned"] > 0
         and report["behind_pinned"] == 0
+        and report["origin_branch_resolved"]
         and not report["nonff_vs_origin"]
-        and not report["behind_origin"]
     )
 
 
@@ -101,6 +101,7 @@ def inspect_submodule(
             behind_pinned=0,
             nonff_vs_origin=False,
             behind_origin=0,
+            origin_branch_resolved=False,
             pointer_uncommitted=index_pin != pinned,
         )
         base["action"] = classify_submodule(base)
@@ -112,6 +113,9 @@ def inspect_submodule(
         SUBMODULE_FETCH_TIMEOUT_SECONDS,
     )
     origin_branch = f"origin/{branch}"
+    origin_branch_resolved = git_command_succeeds(
+        run_capturing, submodule_directory, "rev-parse", "--verify", origin_branch
+    )
     dirty = bool(
         git_output(run_capturing, submodule_directory, "status", "--porcelain")
     )
@@ -153,6 +157,7 @@ def inspect_submodule(
         behind_pinned=behind_pinned,
         nonff_vs_origin=behind_origin > 0 and ahead_origin > 0,
         behind_origin=behind_origin,
+        origin_branch_resolved=origin_branch_resolved,
         pointer_uncommitted=index_pin != pinned,
     )
     base["action"] = classify_submodule(base)
