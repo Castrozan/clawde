@@ -75,29 +75,63 @@ def test_runs_real_probe_command_and_exits_on_change(monkeypatch, tmp_path):
     assert change_gate.gate_fires("true", state_file) is False
 
 
-def test_fire_while_pending_refires_an_unchanged_actionable_state(tmp_path):
+def test_a_retry_budget_refires_an_unchanged_state_then_falls_silent(tmp_path):
     state_file = tmp_path / "steward"
+    fires = [
+        change_gate.gate_fires("echo pending", state_file, retries_while_pending=2)
+        for _tick in range(5)
+    ]
+
+    assert fires == [True, True, True, False, False]
+
+
+def test_a_changed_state_resets_the_retry_budget(tmp_path):
+    state_file = tmp_path / "steward"
+    change_gate.gate_fires("echo pending", state_file, retries_while_pending=1)
+    change_gate.gate_fires("echo pending", state_file, retries_while_pending=1)
 
     assert (
-        change_gate.gate_fires("echo pending", state_file, fire_while_pending=True)
+        change_gate.gate_fires("echo pending", state_file, retries_while_pending=1)
+        is False
+    )
+    assert (
+        change_gate.gate_fires("echo moved", state_file, retries_while_pending=1)
         is True
     )
     assert (
-        change_gate.gate_fires("echo pending", state_file, fire_while_pending=True)
+        change_gate.gate_fires("echo moved", state_file, retries_while_pending=1)
         is True
     )
 
 
-def test_fire_while_pending_still_skips_when_nothing_is_actionable(tmp_path):
-    state_file = tmp_path / "steward"
-    change_gate.store_fingerprint(state_file, "pending")
-
-    assert change_gate.gate_fires("true", state_file, fire_while_pending=True) is False
-    assert not state_file.exists()
-
-
-def test_edge_mode_remains_the_default_and_does_not_refire(tmp_path):
+def test_the_default_budget_keeps_the_gate_purely_edge_triggered(tmp_path):
     state_file = tmp_path / "steward"
 
     assert change_gate.gate_fires("echo pending", state_file) is True
     assert change_gate.gate_fires("echo pending", state_file) is False
+
+
+def test_a_clean_probe_forgets_the_retry_budget(tmp_path):
+    state_file = tmp_path / "steward"
+    change_gate.gate_fires("echo pending", state_file, retries_while_pending=2)
+
+    assert change_gate.gate_fires("true", state_file, retries_while_pending=2) is False
+    assert not state_file.exists()
+    assert (
+        change_gate.gate_fires("echo pending", state_file, retries_while_pending=2)
+        is True
+    )
+
+
+def test_a_legacy_plain_text_state_file_is_read_as_one_prior_fire(tmp_path):
+    state_file = tmp_path / "steward"
+    state_file.write_text("pending")
+
+    assert (
+        change_gate.gate_fires("echo pending", state_file, retries_while_pending=1)
+        is True
+    )
+    assert (
+        change_gate.gate_fires("echo pending", state_file, retries_while_pending=1)
+        is False
+    )

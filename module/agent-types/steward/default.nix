@@ -31,7 +31,7 @@ in
         defaultLaunchOnTrigger = true;
         defaultHeartbeatInterval = "*/15 * * * *";
         defaultHeartbeatPrompt = builtins.readFile ./payload/heartbeat-prompt.md;
-        defaultHeartbeatGateCommand = "clawde-heartbeat-change-gate --label steward --fire-while-pending --probe steward-heartbeat-probe";
+        defaultHeartbeatGateCommand = "clawde-heartbeat-change-gate --label steward --retries-while-pending 2 --probe steward-heartbeat-probe";
         defaultDenyToolPatterns = [
           "mcp__chrome-devtools__*"
           "mcp__browser-use__*"

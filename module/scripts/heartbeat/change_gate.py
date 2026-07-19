@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -24,13 +25,26 @@ def run_probe(probe_command: str) -> tuple[int, str]:
     return completed.returncode, completed.stdout.strip()
 
 
+def read_stored_state(state_file: Path) -> tuple[str | None, int]:
+    if not state_file.is_file():
+        return None, 0
+    raw = state_file.read_text()
+    try:
+        stored = json.loads(raw)
+    except ValueError:
+        return raw, 1
+    return stored.get("fingerprint"), stored.get("fire_count", 1)
+
+
 def read_stored_fingerprint(state_file: Path) -> str | None:
-    return state_file.read_text() if state_file.is_file() else None
+    return read_stored_state(state_file)[0]
 
 
-def store_fingerprint(state_file: Path, fingerprint: str) -> None:
+def store_fingerprint(state_file: Path, fingerprint: str, fire_count: int = 1) -> None:
     state_file.parent.mkdir(parents=True, exist_ok=True)
-    state_file.write_text(fingerprint)
+    state_file.write_text(
+        json.dumps({"fingerprint": fingerprint, "fire_count": fire_count})
+    )
 
 
 def forget_fingerprint(state_file: Path) -> None:
@@ -38,15 +52,22 @@ def forget_fingerprint(state_file: Path) -> None:
 
 
 def gate_fires(
-    probe_command: str, state_file: Path, fire_while_pending: bool = False
+    probe_command: str,
+    state_file: Path,
+    retries_while_pending: int = 0,
 ) -> bool:
     return_code, fingerprint = run_probe(probe_command)
     if return_code != 0 or not fingerprint:
         forget_fingerprint(state_file)
         return False
-    if not fire_while_pending and fingerprint == read_stored_fingerprint(state_file):
+
+    stored_fingerprint, stored_fire_count = read_stored_state(state_file)
+    if fingerprint != stored_fingerprint:
+        store_fingerprint(state_file, fingerprint)
+        return True
+    if stored_fire_count > retries_while_pending:
         return False
-    store_fingerprint(state_file, fingerprint)
+    store_fingerprint(state_file, fingerprint, stored_fire_count + 1)
     return True
 
 
@@ -74,14 +95,17 @@ def parse_arguments() -> argparse.Namespace:
         "when the agent has no reason to wake.",
     )
     parser.add_argument(
-        "--fire-while-pending",
-        action="store_true",
-        help="Treat a non-empty probe fingerprint as a level rather than an edge: fire "
-        "on every tick while the agent reports something actionable, instead of only "
-        "when the fingerprint changes. Use this when the agent's work can outlive one "
-        "tick, because the fingerprint is stored the moment the gate fires rather than "
-        "when the work completes, so a cycle that dies mid-task leaves an unchanged "
-        "state that an edge-triggered gate never surfaces again.",
+        "--retries-while-pending",
+        type=int,
+        default=0,
+        help="How many extra times an unchanged actionable fingerprint may re-fire "
+        "before the gate falls silent on it. The fingerprint is stored the moment the "
+        "gate fires, not when the work completes, so a cycle that dies mid-task leaves "
+        "an unchanged state a pure edge trigger never surfaces again; a small retry "
+        "budget recovers that without restoring the old level-triggered behaviour, "
+        "where a state only the operator could clear re-woke the agent every tick "
+        "forever and burned tokens re-deriving the same decision. Default 0 keeps the "
+        "gate purely edge-triggered.",
     )
     parser.add_argument(
         "--state-file",
@@ -101,7 +125,7 @@ def main() -> int:
     )
     return (
         0
-        if gate_fires(arguments.probe, state_file, arguments.fire_while_pending)
+        if gate_fires(arguments.probe, state_file, arguments.retries_while_pending)
         else 1
     )
 
