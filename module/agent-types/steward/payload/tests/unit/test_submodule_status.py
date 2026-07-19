@@ -11,6 +11,8 @@ def submodule_state(**overrides) -> dict:
         "behind_pinned": 0,
         "drifted": False,
         "pinned_unpushed": False,
+        "nonff_vs_origin": False,
+        "behind_origin": 0,
     }
     base.update(overrides)
     return base
@@ -30,9 +32,29 @@ def test_dirty_submodule_escalates():
     )
 
 
-def test_local_commits_ahead_of_pinned_escalate_as_stranded():
+def test_clean_fast_forward_commits_ahead_of_pinned_advance_the_pin():
     state = submodule_state(ahead_of_pinned=2, drifted=True)
+    assert submodule_status.classify_submodule(state) == "advance_pin"
+
+
+def test_commits_ahead_of_pinned_escalate_when_they_cannot_fast_forward_origin():
+    state = submodule_state(ahead_of_pinned=2, drifted=True, nonff_vs_origin=True)
     assert submodule_status.classify_submodule(state) == "escalate_stranded"
+
+
+def test_commits_ahead_of_pinned_escalate_when_the_checkout_trails_origin():
+    state = submodule_state(ahead_of_pinned=2, drifted=True, behind_origin=3)
+    assert submodule_status.classify_submodule(state) == "escalate_stranded"
+
+
+def test_commits_ahead_of_pinned_escalate_when_the_checkout_also_trails_the_pin():
+    state = submodule_state(ahead_of_pinned=2, behind_pinned=1, drifted=True)
+    assert submodule_status.classify_submodule(state) == "escalate_stranded"
+
+
+def test_a_dirty_submodule_still_escalates_over_advancing_the_pin():
+    state = submodule_state(ahead_of_pinned=2, drifted=True, dirty=True)
+    assert submodule_status.classify_submodule(state) == "escalate_dirty"
 
 
 def test_checked_out_behind_pinned_is_a_safe_sync():

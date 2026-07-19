@@ -49,12 +49,23 @@ def configured_branch(run_capturing, repository: Path, name: str) -> str:
     return branch or "main"
 
 
+def pin_can_be_advanced_safely(report: dict) -> bool:
+    return (
+        report["ahead_of_pinned"] > 0
+        and report["behind_pinned"] == 0
+        and not report["nonff_vs_origin"]
+        and not report["behind_origin"]
+    )
+
+
 def classify_submodule(report: dict) -> str:
     if not report["initialized"]:
         return "init"
     if report["dirty"]:
         return "escalate_dirty"
     if report["ahead_of_pinned"] > 0:
+        if pin_can_be_advanced_safely(report):
+            return "advance_pin"
         return "escalate_stranded"
     if report["drifted"]:
         return "sync"
@@ -89,6 +100,7 @@ def inspect_submodule(
             ahead_of_pinned=0,
             behind_pinned=0,
             nonff_vs_origin=False,
+            behind_origin=0,
             pointer_uncommitted=index_pin != pinned,
         )
         base["action"] = classify_submodule(base)
@@ -140,6 +152,7 @@ def inspect_submodule(
         ahead_of_pinned=ahead_of_pinned,
         behind_pinned=behind_pinned,
         nonff_vs_origin=behind_origin > 0 and ahead_origin > 0,
+        behind_origin=behind_origin,
         pointer_uncommitted=index_pin != pinned,
     )
     base["action"] = classify_submodule(base)
@@ -162,5 +175,6 @@ def submodule_report(run_capturing, repository: Path) -> dict:
         "submodules": submodules,
         "needs_submodule_sync": bool(actions & {"init", "sync"}),
         "needs_submodule_push": "push" in actions,
+        "needs_pin_advance": "advance_pin" in actions,
         "submodule_divergence": bool(actions & {"escalate_dirty", "escalate_stranded"}),
     }
