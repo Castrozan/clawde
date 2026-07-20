@@ -37,11 +37,6 @@ let
     ${builtins.readFile ../scripts/start-clawde.sh}
   '';
 
-  clawdeBashCompletion = pkgs.runCommand "clawde-bash-completion" { } ''
-    install -Dm444 ${../scripts/completion/clawde.bash} \
-      "$out/share/bash-completion/completions/clawde"
-  '';
-
   clawdeGracefulRedeployScript = ../scripts/clawde-redeploy.py;
   clawdeResumeNudgeScript = "${../scripts/heartbeat}/resume_nudge.py";
 
@@ -116,10 +111,11 @@ in
   config = lib.mkIf hasAgents {
     home.packages = [
       clawdeSessionStarter
-      clawdeBashCompletion
       clawdeGracefulRedeploy
       clawdeHeartbeatChangeGate
     ];
+
+    xdg.dataFile."bash-completion/completions/clawde".source = ../scripts/completion/clawde.bash;
 
     systemd.user.services = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       clawde = linuxSystemdUnit;

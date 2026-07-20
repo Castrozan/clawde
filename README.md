@@ -65,9 +65,13 @@ clawde stop my-agent
 clawde list
 ```
 
-The module installs a bash completion under `share/bash-completion/completions/clawde`,
-so the subcommands complete, `start`/`stop` offer only the agents declared `onDemand`,
-and `active` offers only the agents that actually have an active-hours gate.
+The module installs a bash completion at
+`$XDG_DATA_HOME/bash-completion/completions/clawde`, which bash-completion's dynamic
+loader searches first, so the subcommands complete, `start`/`stop` offer only the agents
+declared `onDemand`, and `active` offers only the agents that actually have an
+active-hours gate. It goes to the user data directory rather than the package's `share`
+because nix-darwin's per-user profile does not link `share/bash-completion` onto
+`XDG_DATA_DIRS`.
 
 `clawde start` writes a lease under `~/clawde/on-demand/<agent>.json` and the supervisor
 brings the agent up on its next poll. The lease survives until the agent's session
