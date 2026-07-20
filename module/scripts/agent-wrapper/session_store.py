@@ -2,6 +2,7 @@ import json
 import os
 
 SESSION_IDENTIFIER_SUBDIRECTORY = "session-ids"
+REMEMBERED_PREVIOUS_SESSION_LIMIT = 10
 
 
 def build_session_record_file_path(runtime_root_directory: str, agent_name: str) -> str:
@@ -27,8 +28,42 @@ def read_persisted_session_record(
     return (session_identifier, started_on_date)
 
 
+def read_previous_session_identifiers(session_record_file_path: str) -> list[str]:
+    try:
+        with open(session_record_file_path) as session_record_file:
+            persisted_record = json.load(session_record_file)
+    except (OSError, ValueError):
+        return []
+    previous_session_identifiers = persisted_record.get("previous_session_identifiers")
+    if not isinstance(previous_session_identifiers, list):
+        return []
+    return [
+        identifier
+        for identifier in previous_session_identifiers
+        if isinstance(identifier, str) and identifier
+    ]
+
+
+def remember_previous_session_identifiers(
+    retiring_session_identifier: str | None,
+    previously_remembered_identifiers: list[str],
+    current_session_identifier: str,
+) -> list[str]:
+    remembered_identifiers: list[str] = []
+    for identifier in [retiring_session_identifier] + previously_remembered_identifiers:
+        if not identifier or identifier == current_session_identifier:
+            continue
+        if identifier in remembered_identifiers:
+            continue
+        remembered_identifiers.append(identifier)
+    return remembered_identifiers[:REMEMBERED_PREVIOUS_SESSION_LIMIT]
+
+
 def write_persisted_session_record(
-    session_record_file_path: str, session_identifier: str, started_on_date: str
+    session_record_file_path: str,
+    session_identifier: str,
+    started_on_date: str,
+    previous_session_identifiers: list[str] | None = None,
 ) -> None:
     os.makedirs(os.path.dirname(session_record_file_path), exist_ok=True)
     temporary_file_path = f"{session_record_file_path}.{os.getpid()}.tmp"
@@ -37,6 +72,7 @@ def write_persisted_session_record(
             {
                 "session_identifier": session_identifier,
                 "started_on_date": started_on_date,
+                "previous_session_identifiers": previous_session_identifiers or [],
             },
             session_record_file,
         )

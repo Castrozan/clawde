@@ -14,17 +14,26 @@ from on_demand_lease import (
     write_lease_started_at,
 )
 from session_persistence import session_conversation_exists
-from session_store import build_session_record_file_path, read_persisted_session_record
+from session_store import (
+    build_session_record_file_path,
+    read_persisted_session_record,
+    read_previous_session_identifiers,
+)
 
 
 def describe_resume_target(agent_name: str) -> str:
-    session_identifier, _started_on_date = read_persisted_session_record(
-        build_session_record_file_path(runtime_root_directory(), agent_name)
+    session_record_file_path = build_session_record_file_path(
+        runtime_root_directory(), agent_name
     )
-    if session_conversation_exists(
-        session_identifier, workspace_directory_for_agent(agent_name)
-    ):
-        return f"resuming session {session_identifier}"
+    persisted_session_identifier, _started_on_date = read_persisted_session_record(
+        session_record_file_path
+    )
+    workspace_directory = workspace_directory_for_agent(agent_name)
+    for candidate_identifier in [
+        persisted_session_identifier
+    ] + read_previous_session_identifiers(session_record_file_path):
+        if session_conversation_exists(candidate_identifier, workspace_directory):
+            return f"resuming session {candidate_identifier}"
     return "starting a fresh session"
 
 

@@ -5,6 +5,8 @@ from session_persistence import session_conversation_exists
 from session_store import (
     build_session_record_file_path,
     read_persisted_session_record,
+    read_previous_session_identifiers,
+    remember_previous_session_identifiers,
     write_persisted_session_record,
 )
 
@@ -23,6 +25,18 @@ class LaunchSessionDecision:
         self.session_record_file_path = session_record_file_path
 
 
+def resolve_resumable_session_identifier(
+    persisted_session_identifier: str | None,
+    previous_session_identifiers: list[str],
+) -> str | None:
+    for candidate_identifier in [
+        persisted_session_identifier
+    ] + previous_session_identifiers:
+        if session_conversation_exists(candidate_identifier):
+            return candidate_identifier
+    return None
+
+
 def decide_and_persist_launch_session(
     runtime_root_directory: str,
     agent_name: str,
@@ -34,6 +48,9 @@ def decide_and_persist_launch_session(
     persisted_session_identifier, persisted_started_on_date = (
         read_persisted_session_record(session_record_file_path)
     )
+    previous_session_identifiers = read_previous_session_identifiers(
+        session_record_file_path
+    )
     today = time.strftime("%Y-%m-%d")
 
     rotating_session = (
@@ -41,13 +58,16 @@ def decide_and_persist_launch_session(
         and persisted_started_on_date is not None
         and persisted_started_on_date != today
     )
-    resume_previous_session = (
-        persisted_session_identifier is not None
-        and not rotating_session
-        and session_conversation_exists(persisted_session_identifier)
+    resumable_session_identifier = (
+        None
+        if rotating_session
+        else resolve_resumable_session_identifier(
+            persisted_session_identifier, previous_session_identifiers
+        )
     )
+    resume_previous_session = resumable_session_identifier is not None
     resume_flag, session_identifier = resolve_resume_flag_and_session_identifier(
-        resume_previous_session, persisted_session_identifier
+        resume_previous_session, resumable_session_identifier
     )
     started_on_date = (
         persisted_started_on_date
@@ -55,7 +75,14 @@ def decide_and_persist_launch_session(
         else today
     )
     write_persisted_session_record(
-        session_record_file_path, session_identifier, started_on_date
+        session_record_file_path,
+        session_identifier,
+        started_on_date,
+        remember_previous_session_identifiers(
+            persisted_session_identifier,
+            previous_session_identifiers,
+            session_identifier,
+        ),
     )
 
     return LaunchSessionDecision(
