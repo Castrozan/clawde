@@ -1,6 +1,9 @@
 import datetime
 import os
+import re
 from pathlib import Path
+
+NON_ALPHANUMERIC_CHARACTER = re.compile(r"[^a-zA-Z0-9]")
 
 
 def claude_projects_root() -> Path:
@@ -8,7 +11,9 @@ def claude_projects_root() -> Path:
 
 
 def claude_project_directory_for_workspace(workspace_directory: str) -> Path:
-    return claude_projects_root() / str(workspace_directory).replace("/", "-")
+    return claude_projects_root() / NON_ALPHANUMERIC_CHARACTER.sub(
+        "-", str(workspace_directory)
+    )
 
 
 def session_conversation_file(

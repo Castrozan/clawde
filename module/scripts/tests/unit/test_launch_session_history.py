@@ -7,6 +7,7 @@ sys.path.insert(
 )
 
 import launch_session
+import session_persistence
 import session_store
 
 AGENT_NAME = "on-demand-agent"
@@ -30,8 +31,8 @@ def write_record(runtime_root, session_identifier, started_on_date, previous=Non
 
 
 def create_conversation(home_directory, workspace_directory, session_identifier):
-    project_directory = (
-        home_directory / ".claude" / "projects" / workspace_directory.replace("/", "-")
+    project_directory = session_persistence.claude_project_directory_for_workspace(
+        workspace_directory
     )
     project_directory.mkdir(parents=True, exist_ok=True)
     (project_directory / f"{session_identifier}.jsonl").write_text("{}\n")
