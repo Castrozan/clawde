@@ -65,6 +65,10 @@ clawde stop my-agent
 clawde list
 ```
 
+The module installs a bash completion under `share/bash-completion/completions/clawde`,
+so the subcommands complete, `start`/`stop` offer only the agents declared `onDemand`,
+and `active` offers only the agents that actually have an active-hours gate.
+
 `clawde start` writes a lease under `~/clawde/on-demand/<agent>.json` and the supervisor
 brings the agent up on its next poll. The lease survives until the agent's session
 transcript has been silent for `idleTimeoutMinutes`, at which point the supervisor tears
