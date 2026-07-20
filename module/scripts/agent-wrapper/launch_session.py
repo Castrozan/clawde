@@ -1,6 +1,7 @@
 import time
 
 from session_identity import resolve_resume_flag_and_session_identifier
+from session_persistence import session_conversation_exists
 from session_store import (
     build_session_record_file_path,
     read_persisted_session_record,
@@ -41,7 +42,9 @@ def decide_and_persist_launch_session(
         and persisted_started_on_date != today
     )
     resume_previous_session = (
-        persisted_session_identifier is not None and not rotating_session
+        persisted_session_identifier is not None
+        and not rotating_session
+        and session_conversation_exists(persisted_session_identifier)
     )
     resume_flag, session_identifier = resolve_resume_flag_and_session_identifier(
         resume_previous_session, persisted_session_identifier

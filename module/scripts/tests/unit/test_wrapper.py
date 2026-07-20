@@ -166,3 +166,12 @@ def test_supervise_retries_when_config_unreadable(monkeypatch, tmp_path):
         wrapper.supervise_agent_forever("steward", str(tmp_path / "missing.json"))
 
     assert recorded_sleeps
+
+
+@pytest.fixture(autouse=True)
+def a_pinned_conversation_is_assumed_to_exist(monkeypatch):
+    monkeypatch.setitem(
+        agent_launch_iterations.decide_and_persist_launch_session.__globals__,
+        "session_conversation_exists",
+        lambda _identifier: True,
+    )

@@ -1,6 +1,8 @@
 import importlib.util
 import pathlib
 import sys
+
+import pytest
 import time
 
 AGENT_WRAPPER_DIRECTORY = (
@@ -103,3 +105,10 @@ def test_rotation_on_within_the_same_day_still_resumes(tmp_path):
     )
     assert decision.resume_flag == "--resume S-TODAY"
     assert decision.rotating_session is False
+
+
+@pytest.fixture(autouse=True)
+def a_pinned_conversation_is_assumed_to_exist(monkeypatch):
+    monkeypatch.setattr(
+        launch_session, "session_conversation_exists", lambda _identifier: True
+    )
