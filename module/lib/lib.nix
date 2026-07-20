@@ -103,6 +103,10 @@ let
       launchGateIntervalSeconds = firstNonNull agent.launchGateIntervalSeconds (
         firstNonNull (typeDefault (t: t.defaultLaunchGateIntervalSeconds)) 900
       );
+      onDemand = firstNonNull agent.onDemand (firstNonNull (typeDefault (t: t.defaultOnDemand)) false);
+      idleTimeoutMinutes = firstNonNull agent.idleTimeoutMinutes (
+        firstNonNull (typeDefault (t: t.defaultIdleTimeoutMinutes)) 30
+      );
       personality = firstNonNull agent.personality typePersonality;
       heartbeatInterval = firstNonNull agent.heartbeatInterval (
         typeDefault (t: t.defaultHeartbeatInterval)

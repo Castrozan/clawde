@@ -5,6 +5,7 @@ import time
 import active_hours_decision
 import agent_wrapper_reconcile
 import launch_gate_decision
+import on_demand_decision
 from supervisor_backend_base import (
     SupervisorMultiplexerBackend,
     select_supervisor_backend,
@@ -21,6 +22,8 @@ def agent_should_be_running(
 ) -> bool:
     if not active_hours_decision.agent_should_run_now(agent_name):
         return False
+    if on_demand_decision.agent_runs_on_demand(agent_name):
+        return on_demand_decision.agent_lease_allows_run(agent_name)
     if not launch_gate_decision.agent_launches_on_trigger(agent_name):
         return True
     if agent_has_a_live_wrapper:

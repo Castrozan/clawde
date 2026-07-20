@@ -46,6 +46,37 @@ The consuming configuration injects the host-specific wiring the module does not
   symlinks the immutable in-store payload.
 - `healthCheckLib` (module arg) - optional; when present, clawde contributes health probes.
 
+### On-demand agents
+
+An agent declared with `onDemand = true` is never brought up by the supervisor on its
+own. It holds no process and no multiplexer window until an operator starts it:
+
+```nix
+clawde.agents.my-agent = {
+  type = "project-manager";
+  onDemand = true;
+  idleTimeoutMinutes = 30;
+};
+```
+
+```
+clawde start my-agent
+clawde stop my-agent
+clawde list
+```
+
+`clawde start` writes a lease under `~/clawde/on-demand/<agent>.json` and the supervisor
+brings the agent up on its next poll. The lease survives until the agent's session
+transcript has been silent for `idleTimeoutMinutes`, at which point the supervisor tears
+the agent down through the same path it uses for an agent outside its active hours. The
+idle clock is floored at the moment the lease was granted, so starting an agent whose
+last conversation was days ago does not stop it immediately.
+
+The agent's session record outlives the teardown, so the next `clawde start` resumes the
+same conversation rather than making the operator find it. Set `dailySessionRotation`
+if a fresh session per day is wanted instead. `activeHoursStart`/`activeHoursEnd` still
+apply on top: an on-demand agent outside its active hours stays stopped despite a lease.
+
 ## Outputs
 
 - `homeManagerModules.default` / `homeManagerModules.clawde` - the module.

@@ -83,6 +83,9 @@ let
     active_hours_end = agent.activeHoursEnd;
     active_weekdays_only = agent.activeWeekdaysOnly;
     daily_session_rotation = agent.dailySessionRotation;
+    on_demand = agent.onDemand;
+    idle_timeout_minutes = agent.idleTimeoutMinutes;
+    workspace_directory = agentWorkspaceDirectory name;
     tmux_session = agent.tmuxSession;
   };
 

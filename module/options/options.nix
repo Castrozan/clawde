@@ -94,6 +94,16 @@
             default = null;
             description = "Seconds between launch-gate checks when launchOnTrigger is set. Null inherits the agent type's default, then 900.";
           };
+          onDemand = lib.mkOption {
+            type = lib.types.nullOr lib.types.bool;
+            default = null;
+            description = "When true the supervisor never brings the agent up on its own: it stays fully stopped, holding no process and no multiplexer window, until an operator runs `clawde start <agent>`. The agent then runs a normal warm session until it has been idle for idleTimeoutMinutes, at which point the supervisor tears it down again. Its session record survives the teardown, so the next start resumes the same conversation. Null inherits the agent type's default, then false.";
+          };
+          idleTimeoutMinutes = lib.mkOption {
+            type = lib.types.nullOr lib.types.int;
+            default = null;
+            description = "Minutes of conversation silence after which an onDemand agent stops itself. Measured from the session transcript's last write, floored at the moment the operator started the agent so a fresh start is never immediately idle. Null inherits the agent type's default, then 30.";
+          };
           expose = lib.mkOption {
             type = lib.types.submodule {
               options = {

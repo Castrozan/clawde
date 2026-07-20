@@ -48,19 +48,33 @@ def test_format_agent_rows_aligns_columns_and_includes_header():
             "agent": "ai-first-initiative",
             "active_hours": "08:00-20:00",
             "override": "none",
+            "on_demand": "stopped",
         },
         {
             "agent": "steward",
             "active_hours": "always-on",
             "override": "active until 2026-06-17T08:00:00",
+            "on_demand": "supervised",
         },
     ]
     lines = list_agents.format_agent_rows(agent_rows).split("\n")
     assert lines[0] == (
-        "AGENT".ljust(19) + "  " + "ACTIVE HOURS".ljust(12) + "  " + "OVERRIDE"
+        "AGENT".ljust(19)
+        + "  "
+        + "ACTIVE HOURS".ljust(12)
+        + "  "
+        + "OVERRIDE".ljust(32)
+        + "  "
+        + "ON DEMAND"
     )
     assert lines[1] == (
-        "ai-first-initiative".ljust(19) + "  " + "08:00-20:00".ljust(12) + "  " + "none"
+        "ai-first-initiative".ljust(19)
+        + "  "
+        + "08:00-20:00".ljust(12)
+        + "  "
+        + "none".ljust(32)
+        + "  "
+        + "stopped"
     )
     assert lines[2] == (
         "steward".ljust(19)
@@ -68,6 +82,8 @@ def test_format_agent_rows_aligns_columns_and_includes_header():
         + "always-on".ljust(12)
         + "  "
         + "active until 2026-06-17T08:00:00"
+        + "  "
+        + "supervised"
     )
 
 
@@ -94,8 +110,14 @@ def test_collect_agent_rows_reads_hours_and_override(monkeypatch, tmp_path):
             "agent": "ai-first-initiative",
             "active_hours": "08:00-20:00",
             "override": "active until 2026-06-17T08:00:00",
+            "on_demand": "supervised",
         },
-        {"agent": "steward", "active_hours": "always-on", "override": "none"},
+        {
+            "agent": "steward",
+            "active_hours": "always-on",
+            "override": "none",
+            "on_demand": "supervised",
+        },
     ]
 
 
@@ -110,9 +132,16 @@ def test_collect_agent_rows_marks_unreadable_launch_config(monkeypatch, tmp_path
     )
 
     assert agent_rows == [
-        {"agent": "steward", "active_hours": "unreadable", "override": "none"}
+        {
+            "agent": "steward",
+            "active_hours": "unreadable",
+            "override": "none",
+            "on_demand": "supervised",
+        }
     ]
 
 
 def test_format_agent_rows_with_no_agents_returns_header_line_only():
-    assert list_agents.format_agent_rows([]) == "AGENT  ACTIVE HOURS  OVERRIDE"
+    assert (
+        list_agents.format_agent_rows([]) == "AGENT  ACTIVE HOURS  OVERRIDE  ON DEMAND"
+    )

@@ -26,6 +26,9 @@ let
         shift
         exec ${pkgs.python312}/bin/python3 ${../scripts/agent-wrapper}/list_agents.py "$@"
         ;;
+      start|stop)
+        exec ${pkgs.python312}/bin/python3 ${../scripts/agent-wrapper}/on_demand_control.py "$@"
+        ;;
     esac
     export TMUX_BIN=${pkgs.tmux}/bin/tmux
     export DEFAULT_TMUX_SESSION_NAME=${lib.escapeShellArg defaultTmuxSessionName}

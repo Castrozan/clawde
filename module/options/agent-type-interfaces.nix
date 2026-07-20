@@ -69,6 +69,16 @@
             default = null;
             description = "Launch-gate check interval (seconds) inherited unless the instance overrides it.";
           };
+          defaultOnDemand = lib.mkOption {
+            type = lib.types.nullOr lib.types.bool;
+            default = null;
+            description = "On-demand mode inherited unless the instance overrides it.";
+          };
+          defaultIdleTimeoutMinutes = lib.mkOption {
+            type = lib.types.nullOr lib.types.int;
+            default = null;
+            description = "Idle timeout (minutes) for on-demand agents inherited unless the instance overrides it.";
+          };
           defaultDenyToolPatterns = lib.mkOption {
             type = lib.types.listOf lib.types.str;
             default = [ ];
