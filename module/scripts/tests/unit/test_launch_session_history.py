@@ -85,18 +85,56 @@ def test_a_stale_pointer_with_no_usable_history_starts_fresh(tmp_path, monkeypat
     assert decision.resume_flag.startswith("--session-id ")
 
 
-def test_a_retired_pointer_is_remembered_for_the_next_launch(tmp_path, monkeypatch):
+def test_a_retired_session_with_a_conversation_is_remembered_after_rotation(
+    tmp_path, monkeypatch
+):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.chdir(tmp_path)
-    record_path = write_record(tmp_path / "clawde", "session-never-used", "2026-07-19")
+    create_conversation(tmp_path, str(tmp_path), "yesterdays-session")
+    record_path = write_record(tmp_path / "clawde", "yesterdays-session", "2026-01-01")
 
     launch_session.decide_and_persist_launch_session(
-        str(tmp_path / "clawde"), AGENT_NAME, False
+        str(tmp_path / "clawde"), AGENT_NAME, True
     )
 
     assert json.loads(record_path.read_text())["previous_session_identifiers"] == [
-        "session-never-used"
+        "yesterdays-session"
     ]
+
+
+def test_a_retired_phantom_session_is_not_remembered_after_rotation(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    record_path = write_record(tmp_path / "clawde", "phantom-session", "2026-01-01")
+
+    launch_session.decide_and_persist_launch_session(
+        str(tmp_path / "clawde"), AGENT_NAME, True
+    )
+
+    assert json.loads(record_path.read_text())["previous_session_identifiers"] == []
+
+
+def test_a_phantom_pointer_does_not_bury_the_good_session_in_history(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    create_conversation(tmp_path, str(tmp_path), "good-session")
+    record_path = write_record(
+        tmp_path / "clawde", "phantom-latest", "2026-07-19", ["good-session"]
+    )
+
+    decision = launch_session.decide_and_persist_launch_session(
+        str(tmp_path / "clawde"), AGENT_NAME, False
+    )
+
+    assert decision.resume_flag == "--resume good-session"
+    assert (
+        "phantom-latest"
+        not in json.loads(record_path.read_text())["previous_session_identifiers"]
+    )
 
 
 def test_daily_rotation_still_starts_fresh_despite_a_resumable_history(

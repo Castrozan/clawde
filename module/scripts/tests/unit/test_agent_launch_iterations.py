@@ -15,6 +15,7 @@ def _fake_launch_session():
         resume_previous_session=True,
         rotating_session=False,
         session_record_file_path="/tmp/steward-session.json",
+        session_identifier="abc",
     )
 
 
@@ -49,17 +50,19 @@ def test_triggered_iteration_launches_once_and_never_sleeps(monkeypatch):
     assert slept == []
 
 
-def test_triggered_iteration_drops_a_missing_resume_session(monkeypatch):
+def test_triggered_iteration_drops_only_the_missing_resume_session(monkeypatch):
     _launches, _slept = _patch_common(monkeypatch, resume_session_missing=True)
-    cleared_records = []
+    forgotten = []
     monkeypatch.setattr(
         agent_launch_iterations,
-        "clear_persisted_session_record",
-        lambda record_path: cleared_records.append(record_path),
+        "forget_session_identifier_from_record",
+        lambda record_path, session_identifier: forgotten.append(
+            (record_path, session_identifier)
+        ),
     )
 
     agent_launch_iterations.run_triggered_launch_iteration(
         "steward", "claude --print x", None, "/root", False
     )
 
-    assert cleared_records == ["/tmp/steward-session.json"]
+    assert forgotten == [("/tmp/steward-session.json", "abc")]

@@ -14,7 +14,7 @@ from restart_scheduling import (
     is_within_active_hours,
     should_reset_backoff,
 )
-from session_store import clear_persisted_session_record
+from session_store import forget_session_identifier_from_record
 from session_watchdog import run_launch_command_once
 
 
@@ -50,9 +50,13 @@ def run_triggered_launch_iteration(
         emit_timestamped_log(
             agent_name,
             "could not resume its pinned session (no conversation found); "
-            "dropping the stale session so the next trigger starts a fresh one.",
+            "dropping just that session so the next trigger falls back to "
+            "remembered history.",
         )
-        clear_persisted_session_record(launch_session.session_record_file_path)
+        forget_session_identifier_from_record(
+            launch_session.session_record_file_path,
+            launch_session.session_identifier,
+        )
 
     emit_timestamped_log(
         agent_name,
@@ -98,9 +102,13 @@ def run_warm_session_iteration(
         emit_timestamped_log(
             agent_name,
             "could not resume its pinned session (no conversation found); "
-            "dropping the stale session so the next launch starts a fresh one.",
+            "dropping just that session so the next launch falls back to "
+            "remembered history.",
         )
-        clear_persisted_session_record(launch_session.session_record_file_path)
+        forget_session_identifier_from_record(
+            launch_session.session_record_file_path,
+            launch_session.session_identifier,
+        )
 
     now_after_run = datetime.datetime.now()
     if not active_hours_gate_allows_run(
