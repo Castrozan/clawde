@@ -18,11 +18,13 @@ class LaunchSessionDecision:
         resume_previous_session: bool,
         rotating_session: bool,
         session_record_file_path: str,
+        session_identifier: str,
     ) -> None:
         self.resume_flag = resume_flag
         self.resume_previous_session = resume_previous_session
         self.rotating_session = rotating_session
         self.session_record_file_path = session_record_file_path
+        self.session_identifier = session_identifier
 
 
 def resolve_resumable_session_identifier(
@@ -74,15 +76,20 @@ def decide_and_persist_launch_session(
         if resume_previous_session and persisted_started_on_date is not None
         else today
     )
+    remembered_session_identifiers = [
+        remembered_identifier
+        for remembered_identifier in remember_previous_session_identifiers(
+            persisted_session_identifier,
+            previous_session_identifiers,
+            session_identifier,
+        )
+        if session_conversation_exists(remembered_identifier)
+    ]
     write_persisted_session_record(
         session_record_file_path,
         session_identifier,
         started_on_date,
-        remember_previous_session_identifiers(
-            persisted_session_identifier,
-            previous_session_identifiers,
-            session_identifier,
-        ),
+        remembered_session_identifiers,
     )
 
     return LaunchSessionDecision(
@@ -90,4 +97,5 @@ def decide_and_persist_launch_session(
         resume_previous_session=resume_previous_session,
         rotating_session=rotating_session,
         session_record_file_path=session_record_file_path,
+        session_identifier=session_identifier,
     )

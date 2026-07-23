@@ -56,6 +56,14 @@ def test_a_restart_with_a_persisted_id_resumes_that_exact_session(tmp_path):
     assert decision.resume_previous_session is True
 
 
+def test_the_decision_exposes_the_pinned_session_identifier(tmp_path):
+    _seed(tmp_path, "ai-first", "S1", TODAY)
+    decision = launch_session.decide_and_persist_launch_session(
+        str(tmp_path), "ai-first", daily_session_rotation=False
+    )
+    assert decision.session_identifier == "S1"
+
+
 def test_a_fresh_wrapper_process_still_resumes_from_the_persisted_record(tmp_path):
     _seed(tmp_path, "jenny", "S9", TODAY)
     decision = launch_session.decide_and_persist_launch_session(

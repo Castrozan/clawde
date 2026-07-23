@@ -84,3 +84,34 @@ def clear_persisted_session_record(session_record_file_path: str) -> None:
         os.remove(session_record_file_path)
     except OSError:
         pass
+
+
+def forget_session_identifier_from_record(
+    session_record_file_path: str, session_identifier_to_forget: str
+) -> None:
+    persisted_session_identifier, started_on_date = read_persisted_session_record(
+        session_record_file_path
+    )
+    surviving_previous_identifiers = [
+        remembered_identifier
+        for remembered_identifier in read_previous_session_identifiers(
+            session_record_file_path
+        )
+        if remembered_identifier != session_identifier_to_forget
+    ]
+    surviving_session_identifier = (
+        None
+        if persisted_session_identifier == session_identifier_to_forget
+        else persisted_session_identifier
+    )
+    if surviving_session_identifier is None and surviving_previous_identifiers:
+        surviving_session_identifier = surviving_previous_identifiers.pop(0)
+    if surviving_session_identifier is None:
+        clear_persisted_session_record(session_record_file_path)
+        return
+    write_persisted_session_record(
+        session_record_file_path,
+        surviving_session_identifier,
+        started_on_date,
+        surviving_previous_identifiers,
+    )
