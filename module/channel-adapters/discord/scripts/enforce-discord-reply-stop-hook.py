@@ -91,9 +91,10 @@ def main():
     if chat_id is None:
         sys.exit(0)
     reason = (
-        "You have not delivered your response to Discord. Terminal output never reaches "
+        "You ended the turn without replying to Discord; terminal output never reaches "
         f"the user. Call the reply tool ({DISCORD_REPLY_TOOL_NAME}) with chat_id "
-        f"{chat_id} and your full response now, then stop."
+        f"{chat_id} and send a brief, answer-first Discord reply per the channel rules, "
+        "not your terminal work log, then stop."
     )
     print(json.dumps({"decision": "block", "reason": reason}))
     sys.exit(0)
