@@ -4,10 +4,17 @@ from pathlib import Path
 HEALTH_CHECK_TIMEOUT_SECONDS = 60
 
 
+NON_FAILING_PROBE_STATUSES = ("pass", "skip")
+
+
 def is_own_daemon_self_probe(probe: dict) -> bool:
     return probe.get("category") == "daemon" and "clawde agent: steward" in probe.get(
         "name", ""
     )
+
+
+def is_failing_probe(probe: dict) -> bool:
+    return probe.get("status", "pass") not in NON_FAILING_PROBE_STATUSES
 
 
 def health_check_summary(run_capturing) -> dict:
@@ -24,8 +31,9 @@ def health_check_summary(run_capturing) -> dict:
     failing = [
         probe
         for probe in probes
-        if probe.get("status", "pass") != "pass" and not is_own_daemon_self_probe(probe)
+        if is_failing_probe(probe) and not is_own_daemon_self_probe(probe)
     ]
+    skipped = [probe for probe in probes if probe.get("status") == "skip"]
     return {
         "available": True,
         "exit_code": return_code,
@@ -33,5 +41,10 @@ def health_check_summary(run_capturing) -> dict:
         "failing": [
             f"{probe.get('category', '?')}/{probe.get('name', '?')}"
             for probe in failing
+        ],
+        "skipped": [
+            f"{probe.get('category', '?')}/{probe.get('name', '?')}"
+            f" ({probe.get('reason', 'not applicable')})"
+            for probe in skipped
         ],
     }

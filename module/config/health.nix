@@ -8,12 +8,24 @@
 let
   agentWrapperDirectory = ../scripts/agent-wrapper;
   agentPaneResponsivenessCheckerScript = "${agentWrapperDirectory}/check_agent_pane_responsiveness.py";
+  agentExpectedRunningCheckerScript = "${agentWrapperDirectory}/agent_expected_running.py";
+
+  agentExpectedRunningCommand =
+    agentName:
+    lib.concatStringsSep " " [
+      "PYTHONPATH=${lib.escapeShellArg agentWrapperDirectory}"
+      "${pkgs.python312}/bin/python3"
+      agentExpectedRunningCheckerScript
+      "--agent-name"
+      (lib.escapeShellArg agentName)
+    ];
 
   clawdeAgentProcessProbes = lib.mapAttrsToList (
     agentName: _agentConfig:
     healthCheckLib.mkProcessProbe {
       name = "clawde agent: ${agentName}";
       pattern = "agent-wrapper/wrapper.py --agent-name ${agentName}";
+      applicableWhen = agentExpectedRunningCommand agentName;
     }
   ) config.clawde.agents;
 
@@ -21,6 +33,7 @@ let
     agentName: agentConfig:
     healthCheckLib.mkCommandProbe {
       name = "clawde agent pane responsiveness: ${agentName}";
+      applicableWhen = agentExpectedRunningCommand agentName;
       command = lib.concatStringsSep " " [
         "PYTHONPATH=${lib.escapeShellArg agentWrapperDirectory}"
         "${pkgs.python312}/bin/python3"

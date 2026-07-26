@@ -33,6 +33,39 @@ def test_health_check_summary_ignores_own_daemon_self_probe():
     assert summary["failing"] == ["daemon/clawde agent: golden"]
 
 
+def test_health_check_summary_does_not_count_a_skipped_probe_as_failing():
+    probes = json.dumps(
+        [
+            {
+                "category": "daemon",
+                "name": "clawde agent: golden",
+                "status": "skip",
+                "reason": "weekday-only agent, weekend",
+            },
+            {"category": "daemon", "name": "clawde agent: silver", "status": "fail"},
+        ]
+    )
+    summary = health_summary.health_check_summary(fake_run_capturing(1, probes))
+    assert summary["failing"] == ["daemon/clawde agent: silver"]
+
+
+def test_health_check_summary_reports_why_a_probe_skipped():
+    probes = json.dumps(
+        [
+            {
+                "category": "daemon",
+                "name": "clawde agent: golden",
+                "status": "skip",
+                "reason": "on demand, not started",
+            }
+        ]
+    )
+    summary = health_summary.health_check_summary(fake_run_capturing(0, probes))
+    assert summary["skipped"] == [
+        "daemon/clawde agent: golden (on demand, not started)"
+    ]
+
+
 def test_health_check_summary_marks_unavailable_when_missing():
     summary = health_summary.health_check_summary(fake_run_capturing(127, "not found"))
     assert summary == {"available": False}
