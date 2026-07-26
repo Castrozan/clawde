@@ -5,6 +5,7 @@ ALL_CLEAR = {
     "needs_sync": False,
     "submodule_divergence": False,
     "needs_submodule_sync": False,
+    "needs_submodule_rebase": False,
     "needs_pin_advance": False,
     "needs_validation": False,
     "needs_submodule_push": False,
@@ -68,5 +69,21 @@ def test_pin_advance_precedes_validation_so_the_gitlink_lands_before_the_build()
 def test_submodule_divergence_still_outranks_a_pin_advance():
     assert (
         verdict_for(submodule_divergence=True, needs_pin_advance=True)
+        == "submodule_divergence"
+    )
+
+
+def test_a_submodule_rebase_precedes_the_pin_advance_it_unblocks():
+    assert (
+        verdict_for(
+            needs_submodule_rebase=True, needs_pin_advance=True, needs_validation=True
+        )
+        == "needs_submodule_rebase"
+    )
+
+
+def test_submodule_divergence_still_outranks_a_submodule_rebase():
+    assert (
+        verdict_for(submodule_divergence=True, needs_submodule_rebase=True)
         == "submodule_divergence"
     )

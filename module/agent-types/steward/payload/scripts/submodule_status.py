@@ -58,6 +58,10 @@ def pin_can_be_advanced_safely(report: dict) -> bool:
     )
 
 
+def unpinned_commits_can_be_replayed_onto_origin(report: dict) -> bool:
+    return report["origin_branch_resolved"] and report["nonff_vs_origin"]
+
+
 def classify_submodule(report: dict) -> str:
     if not report["initialized"]:
         return "init"
@@ -66,6 +70,8 @@ def classify_submodule(report: dict) -> str:
     if report["ahead_of_pinned"] > 0:
         if pin_can_be_advanced_safely(report):
             return "advance_pin"
+        if unpinned_commits_can_be_replayed_onto_origin(report):
+            return "rebase_onto_origin"
         return "escalate_stranded"
     if report["drifted"]:
         return "sync"
@@ -180,6 +186,7 @@ def submodule_report(run_capturing, repository: Path) -> dict:
         "submodules": submodules,
         "needs_submodule_sync": bool(actions & {"init", "sync"}),
         "needs_submodule_push": "push" in actions,
+        "needs_submodule_rebase": "rebase_onto_origin" in actions,
         "needs_pin_advance": "advance_pin" in actions,
         "submodule_divergence": bool(actions & {"escalate_dirty", "escalate_stranded"}),
     }

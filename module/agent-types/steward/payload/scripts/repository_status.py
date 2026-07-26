@@ -54,6 +54,7 @@ def classify_verdict(
     needs_sync: bool,
     submodule_divergence: bool,
     needs_submodule_sync: bool,
+    needs_submodule_rebase: bool,
     needs_pin_advance: bool,
     needs_validation: bool,
     needs_submodule_push: bool,
@@ -70,6 +71,8 @@ def classify_verdict(
         return "submodule_divergence"
     if needs_submodule_sync:
         return "needs_submodule_sync"
+    if needs_submodule_rebase:
+        return "needs_submodule_rebase"
     if needs_pin_advance:
         return "needs_pin_advance"
     if needs_validation:

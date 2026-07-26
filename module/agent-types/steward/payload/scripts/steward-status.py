@@ -79,6 +79,7 @@ def build_report() -> dict:
     submodule_divergence = submodules["submodule_divergence"]
     needs_submodule_sync = submodules["needs_submodule_sync"]
     needs_submodule_push = submodules["needs_submodule_push"]
+    needs_submodule_rebase = submodules["needs_submodule_rebase"]
     needs_pin_advance = submodules["needs_pin_advance"]
 
     verdict = classify_verdict(
@@ -86,6 +87,7 @@ def build_report() -> dict:
         needs_sync=needs_sync,
         submodule_divergence=submodule_divergence,
         needs_submodule_sync=needs_submodule_sync,
+        needs_submodule_rebase=needs_submodule_rebase,
         needs_pin_advance=needs_pin_advance,
         needs_validation=needs_validation,
         needs_submodule_push=needs_submodule_push,
@@ -115,6 +117,7 @@ def build_report() -> dict:
         "submodules": submodules["submodules"],
         "needs_submodule_sync": needs_submodule_sync,
         "needs_submodule_push": needs_submodule_push,
+        "needs_submodule_rebase": needs_submodule_rebase,
         "needs_pin_advance": needs_pin_advance,
         "submodule_divergence": submodule_divergence,
         "health": health,
