@@ -14,7 +14,7 @@ let
   agentExpectedRunningCommand =
     agentName:
     lib.concatStringsSep " " [
-      "PYTHONPATH=${lib.escapeShellArg agentWrapperDirectory}"
+      "PYTHONPATH=${lib.escapeShellArg "${agentWrapperDirectory}:${sharedHarnessDirectory}"}"
       "${pkgs.python312}/bin/python3"
       agentExpectedRunningCheckerScript
       "--agent-name"

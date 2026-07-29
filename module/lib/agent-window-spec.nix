@@ -112,7 +112,7 @@ let
       execPythonWrapperInvocation = lib.concatStringsSep " " [
         "exec"
         "env"
-        "PYTHONPATH=${../scripts/harness}"
+        "PYTHONPATH=${../scripts/agent-wrapper}:${../scripts/harness}"
         "${pkgs.python312}/bin/python3"
         "${../scripts/agent-wrapper}/wrapper.py"
         "--agent-name ${lib.escapeShellArg name}"

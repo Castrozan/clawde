@@ -38,6 +38,8 @@ let
   '';
 
   clawdeGracefulRedeployScript = ../scripts/clawde-redeploy.py;
+
+  clawdePythonModuleSearchPath = "${../scripts/agent-wrapper}:${../scripts/harness}";
   clawdeResumeNudgeScript = "${../scripts/heartbeat}/resume_nudge.py";
 
   clawdeHeartbeatChangeGate = pkgs.writeShellScriptBin "clawde-heartbeat-change-gate" ''
@@ -47,7 +49,7 @@ let
   clawdeGracefulRedeploy = pkgs.writeShellScriptBin "clawde-redeploy" ''
     export CLAWDE_RESUME_NUDGE_SCRIPT=${clawdeResumeNudgeScript}
     export CLAWDE_HEARTBEAT_SCRIPTS_DIR=${../scripts/heartbeat}
-    export PYTHONPATH=${../scripts/harness}
+    export PYTHONPATH=${clawdePythonModuleSearchPath}
     exec ${pkgs.python312}/bin/python3 ${clawdeGracefulRedeployScript} "$@"
   '';
 
@@ -82,7 +84,7 @@ let
         "TMUX_TMPDIR=%t"
         "XDG_RUNTIME_DIR=%t"
         "CLAWDE_MULTIPLEXER=${config.clawde.multiplexer}"
-        "PYTHONPATH=${../scripts/agent-wrapper}"
+        "PYTHONPATH=${clawdePythonModuleSearchPath}"
       ];
     };
     Install = {
@@ -101,7 +103,7 @@ let
         PATH = clawdeRuntimePaths;
         HOME = homeDir;
         CLAWDE_MULTIPLEXER = config.clawde.multiplexer;
-        PYTHONPATH = "${../scripts/agent-wrapper}";
+        PYTHONPATH = clawdePythonModuleSearchPath;
       };
       StandardOutPath = "${homeDir}/Library/Logs/clawde.out.log";
       StandardErrorPath = "${homeDir}/Library/Logs/clawde.err.log";
