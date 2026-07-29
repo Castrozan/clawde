@@ -15,7 +15,7 @@ let
 
   agentScopedMcpConfigFlagsFor =
     name: agent:
-    lib.optionalString (agent.mcpServers != { }) (
+    lib.optionalString (agent.mcpServers != null) (
       let
         agentScopedMcpConfigFile = pkgs.writeText "clawde-agent-mcp-config-${name}.json" (
           builtins.toJSON { inherit (agent) mcpServers; }

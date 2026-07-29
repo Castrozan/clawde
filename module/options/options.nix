@@ -38,9 +38,9 @@
             description = "Tool patterns this agent must never invoke, written into whatever per-agent permission surface the harness provides. Composed additively with the agent type's default deny patterns.";
           };
           mcpServers = lib.mkOption {
-            type = lib.types.attrsOf (lib.types.attrsOf lib.types.anything);
-            default = { };
-            description = "MCP servers scoped to this agent alone, keyed by server name, in the shape the harness expects for one server. Held as data rather than a config file path so every harness serializes it into its own format, and so nothing has to read a store path back during evaluation, which would build another system's derivation on the evaluating host. A non-empty set means only these servers spawn and the user-scoped global set is ignored; empty inherits the global set.";
+            type = lib.types.nullOr (lib.types.attrsOf (lib.types.attrsOf lib.types.anything));
+            default = null;
+            description = "MCP servers scoped to this agent alone, keyed by server name, in the shape the harness expects for one server. Held as data rather than a config file path so every harness serializes it into its own format, and so nothing has to read a store path back during evaluation, which would build another system's derivation on the evaluating host. Null inherits the user-scoped global set. Any attrset puts the harness in strict MCP mode serving exactly these servers, so the empty set is how an agent is given no MCP servers at all rather than all of them.";
           };
           permissionMode = lib.mkOption {
             type = lib.types.nullOr (

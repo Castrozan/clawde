@@ -4,7 +4,10 @@ let
     let
       captures = builtins.match "mcp__(.*)__\\*" pattern;
     in
-    captures != null && !(builtins.elem (builtins.head captures) (builtins.attrNames agent.mcpServers));
+    captures != null
+    && !(builtins.elem (builtins.head captures) (
+      if agent.mcpServers == null then [ ] else builtins.attrNames agent.mcpServers
+    ));
 
   namesASkillInvocation = pattern: builtins.match "Skill\\(.*\\)" pattern != null;
 in
