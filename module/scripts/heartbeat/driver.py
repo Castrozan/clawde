@@ -5,6 +5,7 @@ import sys
 import time
 
 from cron import cron_expression_matches, seconds_until_next_minute_boundary
+from harness_runtime_profile import load_harness_runtime_profile_from_launch_config
 from multiplexer import select_heartbeat_backend
 from pane_content import HeartbeatMultiplexerBackend
 
@@ -29,6 +30,7 @@ def gate_allows_wake(gate_command: str | None) -> bool:
 def drive_heartbeat(
     backend: HeartbeatMultiplexerBackend,
     pane_handle,
+    harness_runtime_profile,
     cron_expression: str,
     prompt: str,
     gate_command: str | None,
@@ -38,7 +40,7 @@ def drive_heartbeat(
         now = datetime.datetime.now()
         if not cron_expression_matches(cron_expression, now):
             continue
-        if not backend.pane_is_idle(pane_handle):
+        if not backend.pane_is_idle(pane_handle, harness_runtime_profile):
             continue
         if not gate_allows_wake(gate_command):
             continue
@@ -57,6 +59,12 @@ def parse_arguments() -> argparse.Namespace:
         "--window", required=True, help="multiplexer window/tab name (agent name)"
     )
     parser.add_argument(
+        "--launch-config",
+        required=True,
+        help="Path to the agent's JSON launch config, read for the harness runtime "
+        "profile that says how to recognize this harness's idle prompt and modals",
+    )
+    parser.add_argument(
         "--interval", required=True, help="Cron expression for heartbeat interval"
     )
     parser.add_argument(
@@ -72,6 +80,9 @@ def parse_arguments() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_arguments()
+    harness_runtime_profile = load_harness_runtime_profile_from_launch_config(
+        args.launch_config
+    )
 
     backend = select_heartbeat_backend()
     pane_handle = backend.prepare_pane_handle(args.session, args.window)
@@ -79,16 +90,25 @@ def main() -> None:
         print("Error: could not resolve agent pane", file=sys.stderr)
         sys.exit(1)
 
-    if not backend.wait_until_agent_is_past_pre_prompt_gates(pane_handle):
+    if not backend.wait_until_agent_is_past_pre_prompt_gates(
+        pane_handle, harness_runtime_profile
+    ):
         print(
-            "Error: claude did not get past onboarding or the resume-confirmation "
-            "modal after waiting; it is wedged at a pre-prompt gate. "
-            "Not driving heartbeat.",
+            f"Error: {harness_runtime_profile.harness_name} did not get past "
+            "onboarding or a pre-prompt modal after waiting; it is wedged at a "
+            "pre-prompt gate. Not driving heartbeat.",
             file=sys.stderr,
         )
         sys.exit(1)
 
-    drive_heartbeat(backend, pane_handle, args.interval, args.prompt, args.gate_command)
+    drive_heartbeat(
+        backend,
+        pane_handle,
+        harness_runtime_profile,
+        args.interval,
+        args.prompt,
+        args.gate_command,
+    )
 
 
 if __name__ == "__main__":

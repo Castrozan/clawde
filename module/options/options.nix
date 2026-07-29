@@ -17,25 +17,30 @@
             default = "";
             description = "Extra instructions concatenated after base + channel adapter blocks. Overlays for further specialization (PM, browser, etc).";
           };
+          harness = lib.mkOption {
+            type = lib.types.str;
+            default = "claude";
+            description = "Agent CLI this agent runs on. Selects a registered clawde.harnesses entry that owns the launch command, the pane markers the runtime reads, session resume, and the harness's own per-agent configuration files.";
+          };
           model = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
             default = null;
-            description = "Claude model alias (opus, sonnet, haiku). Null inherits the agent type's default, falling back to sonnet.";
+            description = "Model identifier in the harness's own vocabulary (claude aliases like opus/sonnet, codex ids like gpt-5.6-sol). Null inherits the agent type's default, falling back to the harness's defaultModel.";
           };
           skillDirectories = lib.mkOption {
             type = lib.types.listOf lib.types.str;
             default = [ ];
-            description = "Absolute paths passed as --add-dir. Composed additively with the agent type's default skill directories.";
+            description = "Absolute paths to skill sets laid out as <dir>/.claude/skills/<skill-name>, the de-facto on-disk skill format. Each harness projects them into its own discovery mechanism. Composed additively with the agent type's default skill directories.";
           };
           denyToolPatterns = lib.mkOption {
             type = lib.types.listOf lib.types.str;
             default = [ ];
-            description = "Tool patterns written into the agent workspace .claude/settings.json under permissions.deny. Composed additively with the agent type's default deny patterns.";
+            description = "Tool patterns this agent must never invoke, written into whatever per-agent permission surface the harness provides. Composed additively with the agent type's default deny patterns.";
           };
           mcpConfigFile = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
             default = null;
-            description = "Absolute path to an MCP config JSON in the { mcpServers = { ... }; } shape. When set, the agent launches with --strict-mcp-config --mcp-config <path>, so only these servers spawn and the user-scoped ~/.claude.json mcpServers are ignored for this agent. Null inherits the global MCP set, spawning every user-scoped server in this agent's session.";
+            description = "Absolute path to an MCP config JSON in the { mcpServers = { ... }; } shape. When set, only these servers spawn for this agent and the user-scoped global MCP set is ignored. Null inherits the global MCP set, spawning every user-scoped server in this agent's session.";
           };
           permissionMode = lib.mkOption {
             type = lib.types.nullOr (
@@ -47,7 +52,7 @@
               ]
             );
             default = null;
-            description = "Claude Code permission mode. Null inherits the agent type's default, falling back to 'default'. 'bypassPermissions' for fully autonomous agents.";
+            description = "How much the agent may do without asking. Null inherits the agent type's default, falling back to 'default'. 'bypassPermissions' for fully autonomous agents. Harnesses that model this differently translate the value; codex agents are unattended by construction and ignore it.";
           };
           heartbeatInterval = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
@@ -135,10 +140,10 @@
                         default = "";
                         description = "Free-form description published in the Agent Card. Defaults to the agent name when empty.";
                       };
-                      tmuxMeaningfulLinePattern = lib.mkOption {
-                        type = lib.types.str;
-                        default = "^⏺ ";
-                        description = "Regex matching the only pane lines that count as meaningful new output. Filters out status-line and spinner redraws so the a2a-server's idle auto-complete fires. Default '^⏺ ' matches claude-code response markers.";
+                      meaningfulLinePattern = lib.mkOption {
+                        type = lib.types.nullOr lib.types.str;
+                        default = null;
+                        description = "Regex matching the only pane lines that count as meaningful new output. Filters out status-line and spinner redraws so the a2a-server's idle auto-complete fires. Null inherits the harness's own response-marker pattern, which is the right answer unless the agent renders through something else.";
                       };
                     };
                   };

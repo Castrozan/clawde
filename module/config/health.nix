@@ -7,6 +7,7 @@
 }:
 let
   agentWrapperDirectory = ../scripts/agent-wrapper;
+  sharedHarnessDirectory = ../scripts/harness;
   agentPaneResponsivenessCheckerScript = "${agentWrapperDirectory}/check_agent_pane_responsiveness.py";
   agentExpectedRunningCheckerScript = "${agentWrapperDirectory}/agent_expected_running.py";
 
@@ -19,6 +20,10 @@ let
       "--agent-name"
       (lib.escapeShellArg agentName)
     ];
+
+  runtimeLocations = import ../lib/runtime-locations.nix {
+    homeDir = config.home.homeDirectory;
+  };
 
   clawdeAgentProcessProbes = lib.mapAttrsToList (
     agentName: _agentConfig:
@@ -35,11 +40,13 @@ let
       name = "clawde agent pane responsiveness: ${agentName}";
       applicableWhen = agentExpectedRunningCommand agentName;
       command = lib.concatStringsSep " " [
-        "PYTHONPATH=${lib.escapeShellArg agentWrapperDirectory}"
+        "PYTHONPATH=${lib.escapeShellArg "${agentWrapperDirectory}:${sharedHarnessDirectory}"}"
         "${pkgs.python312}/bin/python3"
         "${agentPaneResponsivenessCheckerScript}"
         "--tmux-target"
         (lib.escapeShellArg "${agentConfig.tmuxSession}:${agentName}")
+        "--launch-config"
+        (lib.escapeShellArg (runtimeLocations.agentLaunchConfigFile agentName))
       ];
     }
   ) config.clawde.agents;

@@ -10,14 +10,14 @@ let
     hasAgents
     agentNames
     runtimeLocations
-    buildAgentClaudeMarkdownContentByName
+    buildAgentInstructionsContentByName
     ;
 
   agentInstructionsFiles = lib.listToAttrs (
     map (name: {
       name = runtimeLocations.agentInstructionsRelativeToHome name;
       value = {
-        text = buildAgentClaudeMarkdownContentByName name;
+        text = buildAgentInstructionsContentByName name;
       };
     }) agentNames
   );

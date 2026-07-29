@@ -19,9 +19,9 @@ let
     ${builtins.readFile ./scripts/update-claude-plugins-marketplace.sh}
   '';
 
-  seedDiscordWorkspaceScript = pkgs.writeShellScript "seed-one-workspace-discord" (
-    builtins.readFile ../../scripts/seed-one-workspace.sh
-  );
+  enforceDiscordReplyStopHook = pkgs.writeShellScript "enforce-discord-reply-stop-hook" ''
+    exec ${pkgs.python312}/bin/python3 ${./scripts/enforce-discord-reply-stop-hook.py} "$@"
+  '';
 
   injectOneSecretScript = pkgs.writeShellScript "inject-one-discord-bot-token" (
     builtins.readFile ../../scripts/inject-one-secret.sh
@@ -75,12 +75,25 @@ in
           tokenAssignment = lib.optionalString hasToken "DISCORD_BOT_TOKEN=$(cat ${tokenFile}) ";
         in
         "${waitForTokenPrefix}${stateDirectoryAssignment}${tokenAssignment}";
+      workspaceSettingsFor = _: {
+        hooks.Stop = [
+          {
+            hooks = [
+              {
+                type = "command";
+                command = "${enforceDiscordReplyStopHook}";
+              }
+            ];
+          }
+        ];
+        enabledPlugins."discord@claude-plugins-official" = true;
+      };
+
       agentActivationScriptFor =
         {
           name,
           agent,
-          workspaceDirectory,
-          claudeBinary,
+          ...
         }:
         let
           secretInjectionLine =
@@ -94,7 +107,6 @@ in
           mergeChannelAccessLine = "${mergeDiscordChannelAccessCommand} --state-directory ${lib.escapeShellArg (discordChannelEnvDirectoryFor name)} --shared-access-file ${lib.escapeShellArg sharedDiscordAccessFile}${channelsSecretFlag}";
         in
         ''
-          ${seedDiscordWorkspaceScript} ${lib.escapeShellArg workspaceDirectory} ${lib.escapeShellArg claudeBinary}
           ${secretInjectionLine}
           ${mergeChannelAccessLine}
         '';

@@ -31,17 +31,21 @@ def run_triggered_launch_iteration(
     tmux_target: str | None,
     runtime_root_directory: str,
     daily_session_rotation: bool,
+    harness_runtime_profile,
 ) -> None:
     launch_session = decide_and_persist_launch_session(
         runtime_root_directory,
         agent_name,
         daily_session_rotation,
+        harness_runtime_profile,
     )
     triggered_runtime_seconds, _exceeded_runtime_cap, resume_session_missing = (
         run_launch_command_to_completion(
             launch_command,
             tmux_target,
-            resume_flag=launch_session.resume_flag,
+            harness_runtime_profile=harness_runtime_profile,
+            agent_name=agent_name,
+            session_argv=launch_session.session_argv,
             register_child_pid=register_current_child_process_id,
             is_resume_launch=launch_session.resume_previous_session,
         )
@@ -78,11 +82,13 @@ def run_warm_session_iteration(
     active_weekdays_only: bool,
     heartbeat_driver_log_path: str,
     restart_delay_seconds: int,
+    harness_runtime_profile,
 ) -> int:
     launch_session = decide_and_persist_launch_session(
         runtime_root_directory,
         agent_name,
         daily_session_rotation,
+        harness_runtime_profile,
     )
     if launch_session.rotating_session:
         emit_timestamped_log(agent_name, "daily session rotation. Starting fresh.")
@@ -91,7 +97,9 @@ def run_warm_session_iteration(
         launch_command,
         heartbeat_driver_argv,
         tmux_target,
-        resume_flag=launch_session.resume_flag,
+        harness_runtime_profile=harness_runtime_profile,
+        agent_name=agent_name,
+        session_argv=launch_session.session_argv,
         register_child_pid=register_current_child_process_id,
         daily_session_rotation=daily_session_rotation,
         heartbeat_driver_log_path=heartbeat_driver_log_path,

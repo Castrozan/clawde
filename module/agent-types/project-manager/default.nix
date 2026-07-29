@@ -54,7 +54,6 @@ in
     agentActivationScriptFor =
       { workspaceDirectory, ... }:
       "${seedProjectManagerWorkspaceScript} ${lib.escapeShellArg workspaceDirectory}";
-    defaultModel = "claude-opus-4-8";
     defaultPermissionMode = "bypassPermissions";
     defaultActiveHoursStart = 8;
     defaultActiveHoursEnd = 20;

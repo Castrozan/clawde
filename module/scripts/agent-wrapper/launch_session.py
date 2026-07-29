@@ -1,6 +1,6 @@
 import time
 
-from session_identity import resolve_resume_flag_and_session_identifier
+from session_identity import resolve_session_argv_and_identifier
 from session_persistence import session_conversation_exists
 from session_store import (
     build_session_record_file_path,
@@ -14,13 +14,13 @@ from session_store import (
 class LaunchSessionDecision:
     def __init__(
         self,
-        resume_flag: str,
+        session_argv: str,
         resume_previous_session: bool,
         rotating_session: bool,
         session_record_file_path: str,
         session_identifier: str,
     ) -> None:
-        self.resume_flag = resume_flag
+        self.session_argv = session_argv
         self.resume_previous_session = resume_previous_session
         self.rotating_session = rotating_session
         self.session_record_file_path = session_record_file_path
@@ -28,13 +28,14 @@ class LaunchSessionDecision:
 
 
 def resolve_resumable_session_identifier(
+    harness_runtime_profile,
     persisted_session_identifier: str | None,
     previous_session_identifiers: list[str],
 ) -> str | None:
     for candidate_identifier in [
         persisted_session_identifier
     ] + previous_session_identifiers:
-        if session_conversation_exists(candidate_identifier):
+        if session_conversation_exists(harness_runtime_profile, candidate_identifier):
             return candidate_identifier
     return None
 
@@ -43,6 +44,7 @@ def decide_and_persist_launch_session(
     runtime_root_directory: str,
     agent_name: str,
     daily_session_rotation: bool,
+    harness_runtime_profile,
 ) -> LaunchSessionDecision:
     session_record_file_path = build_session_record_file_path(
         runtime_root_directory, agent_name
@@ -64,12 +66,14 @@ def decide_and_persist_launch_session(
         None
         if rotating_session
         else resolve_resumable_session_identifier(
-            persisted_session_identifier, previous_session_identifiers
+            harness_runtime_profile,
+            persisted_session_identifier,
+            previous_session_identifiers,
         )
     )
     resume_previous_session = resumable_session_identifier is not None
-    resume_flag, session_identifier = resolve_resume_flag_and_session_identifier(
-        resume_previous_session, resumable_session_identifier
+    session_argv, session_identifier = resolve_session_argv_and_identifier(
+        harness_runtime_profile, resume_previous_session, resumable_session_identifier
     )
     started_on_date = (
         persisted_started_on_date
@@ -83,7 +87,7 @@ def decide_and_persist_launch_session(
             previous_session_identifiers,
             session_identifier,
         )
-        if session_conversation_exists(remembered_identifier)
+        if session_conversation_exists(harness_runtime_profile, remembered_identifier)
     ]
     write_persisted_session_record(
         session_record_file_path,
@@ -93,7 +97,7 @@ def decide_and_persist_launch_session(
     )
 
     return LaunchSessionDecision(
-        resume_flag=resume_flag,
+        session_argv=session_argv,
         resume_previous_session=resume_previous_session,
         rotating_session=rotating_session,
         session_record_file_path=session_record_file_path,

@@ -6,12 +6,15 @@ sys.path.insert(
 )
 
 import session_persistence
+from harness_profile_test_helpers import make_claude_profile
+
+CLAUDE_PROFILE = make_claude_profile()
 
 
 def project_directory_name(workspace_directory):
-    return session_persistence.claude_project_directory_for_workspace(
-        workspace_directory
-    ).name
+    return session_persistence.session_transcript_file(
+        CLAUDE_PROFILE, "any-session", workspace_directory
+    ).parent.name
 
 
 def test_a_dot_in_the_workspace_path_becomes_a_dash(monkeypatch, tmp_path):
@@ -51,5 +54,5 @@ def test_a_conversation_under_a_dotted_workspace_path_is_found(monkeypatch, tmp_
     (project_directory / "session-one.jsonl").write_text("{}\n")
 
     assert session_persistence.session_conversation_exists(
-        "session-one", workspace_directory
+        CLAUDE_PROFILE, "session-one", workspace_directory
     )

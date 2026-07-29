@@ -97,7 +97,7 @@
           agentActivationScriptFor = lib.mkOption {
             type = lib.types.functionTo lib.types.str;
             default = _: "";
-            description = "Function: { name, agent, workspaceDirectory, claudeBinary } -> shell snippet appended to home.activation for type-specific workspace seeding.";
+            description = "Function: { name, agent, workspaceDirectory, harnessBinary } -> shell snippet appended to home.activation for type-specific workspace seeding.";
           };
           preActivation = lib.mkOption {
             type = lib.types.nullOr lib.types.str;

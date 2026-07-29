@@ -2,6 +2,8 @@ import importlib.util
 import pathlib
 import sys
 
+from harness_profile_test_helpers import make_claude_profile
+
 HEARTBEAT_DIRECTORY = (
     pathlib.Path(__file__).resolve().parent.parent.parent / "heartbeat"
 )
@@ -18,15 +20,16 @@ def _load_pane_content_module():
 
 
 pane_content = _load_pane_content_module()
+CLAUDE_PROFILE = make_claude_profile()
 
 
 def test_pane_at_repl_prompt_detects_bare_marker():
-    assert pane_content.pane_is_at_claude_repl_prompt("some output\n❯\n")
-    assert pane_content.pane_is_at_claude_repl_prompt("prefixed line ❯")
+    assert CLAUDE_PROFILE.pane_is_at_idle_prompt("some output\n❯\n")
+    assert CLAUDE_PROFILE.pane_is_at_idle_prompt("prefixed line ❯")
 
 
 def test_pane_with_empty_prompt_and_trailing_space_is_idle():
-    assert pane_content.pane_is_at_claude_repl_prompt("some output\n❯ \n")
+    assert CLAUDE_PROFILE.pane_is_at_idle_prompt("some output\n❯ \n")
 
 
 def test_pane_with_autosuggestion_ghost_is_idle():
@@ -36,17 +39,17 @@ def test_pane_with_autosuggestion_ghost_is_idle():
         "❯\xa0Leave the submodule, end the tick\n"
         "────\n"
     )
-    assert pane_content.pane_is_at_claude_repl_prompt(pane_with_history_ghost)
+    assert CLAUDE_PROFILE.pane_is_at_idle_prompt(pane_with_history_ghost)
 
 
 def test_pane_with_real_typed_input_is_not_idle():
     pane_with_pending_input = "some output\n❯ git status\n"
-    assert not pane_content.pane_is_at_claude_repl_prompt(pane_with_pending_input)
+    assert not CLAUDE_PROFILE.pane_is_at_idle_prompt(pane_with_pending_input)
 
 
 def test_pane_at_onboarding_is_not_treated_as_idle_prompt():
     onboarding_pane = "Select login method\n❯ 1. Claude account with subscription"
-    assert not pane_content.pane_is_at_claude_repl_prompt(onboarding_pane)
+    assert not CLAUDE_PROFILE.pane_is_at_idle_prompt(onboarding_pane)
 
 
 RESUME_CONFIRMATION_MODAL_PANE = (
@@ -62,13 +65,14 @@ RESUME_CONFIRMATION_MODAL_PANE = (
 
 
 def test_resume_confirmation_modal_is_detected():
-    assert pane_content.pane_indicates_resume_confirmation_modal(
-        RESUME_CONFIRMATION_MODAL_PANE
+    assert (
+        CLAUDE_PROFILE.matching_pre_prompt_modal(RESUME_CONFIRMATION_MODAL_PANE)
+        is not None
     )
 
 
 def test_ordinary_idle_prompt_is_not_a_resume_confirmation_modal():
-    assert not pane_content.pane_indicates_resume_confirmation_modal("some output\n❯\n")
+    assert CLAUDE_PROFILE.matching_pre_prompt_modal("some output\n❯\n") is None
 
 
 class _ScriptedCaptureBackend(pane_content.HeartbeatMultiplexerBackend):
@@ -94,23 +98,23 @@ class _ScriptedCaptureBackend(pane_content.HeartbeatMultiplexerBackend):
 
 def test_pane_is_idle_reads_through_backend_capture():
     backend = _ScriptedCaptureBackend(["some work\n❯\n"])
-    assert backend.pane_is_idle("handle")
+    assert backend.pane_is_idle("handle", CLAUDE_PROFILE)
 
 
 def test_pane_is_not_idle_when_capture_shows_pending_input():
     backend = _ScriptedCaptureBackend(["some output\n❯ git status\n"])
-    assert not backend.pane_is_idle("handle")
+    assert not backend.pane_is_idle("handle", CLAUDE_PROFILE)
 
 
-def test_dismiss_resume_modal_presses_enter_on_the_confirmation_dialog():
+def test_dismiss_pre_prompt_modal_presses_enter_on_the_confirmation_dialog():
     backend = _ScriptedCaptureBackend([RESUME_CONFIRMATION_MODAL_PANE, "● back\n❯\n"])
-    backend.dismiss_resume_confirmation_modal_if_present("handle")
+    backend.dismiss_pre_prompt_modal_if_present("handle", CLAUDE_PROFILE)
     assert backend.keys_sent == ["Enter"]
 
 
-def test_dismiss_resume_modal_is_a_noop_at_an_ordinary_prompt():
+def test_dismiss_pre_prompt_modal_is_a_noop_at_an_ordinary_prompt():
     backend = _ScriptedCaptureBackend(["● already home\n❯\n"])
-    backend.dismiss_resume_confirmation_modal_if_present("handle")
+    backend.dismiss_pre_prompt_modal_if_present("handle", CLAUDE_PROFILE)
     assert backend.keys_sent == []
 
 
@@ -139,13 +143,19 @@ BUSY_WORKING_PANE = (
 def test_pre_prompt_gate_passes_a_busy_working_agent(monkeypatch):
     monkeypatch.setattr(pane_content.time, "sleep", lambda _seconds: None)
     backend = _ConstantCaptureBackend(BUSY_WORKING_PANE)
-    assert backend.wait_until_agent_is_past_pre_prompt_gates("handle") is True
+    assert (
+        backend.wait_until_agent_is_past_pre_prompt_gates("handle", CLAUDE_PROFILE)
+        is True
+    )
 
 
 def test_pre_prompt_gate_passes_an_idle_agent(monkeypatch):
     monkeypatch.setattr(pane_content.time, "sleep", lambda _seconds: None)
     backend = _ConstantCaptureBackend("● standing by\n❯\n")
-    assert backend.wait_until_agent_is_past_pre_prompt_gates("handle") is True
+    assert (
+        backend.wait_until_agent_is_past_pre_prompt_gates("handle", CLAUDE_PROFILE)
+        is True
+    )
 
 
 def test_pre_prompt_gate_gives_up_when_wedged_at_onboarding(monkeypatch):
@@ -153,7 +163,10 @@ def test_pre_prompt_gate_gives_up_when_wedged_at_onboarding(monkeypatch):
     backend = _ConstantCaptureBackend(
         "Select login method\n❯ 1. Claude account with subscription"
     )
-    assert backend.wait_until_agent_is_past_pre_prompt_gates("handle") is False
+    assert (
+        backend.wait_until_agent_is_past_pre_prompt_gates("handle", CLAUDE_PROFILE)
+        is False
+    )
 
 
 def test_pre_prompt_gate_dismisses_then_passes_after_resume_modal(monkeypatch):
@@ -161,7 +174,10 @@ def test_pre_prompt_gate_dismisses_then_passes_after_resume_modal(monkeypatch):
     backend = _ScriptedCaptureBackend(
         [RESUME_CONFIRMATION_MODAL_PANE, "● resumed\n❯\n"]
     )
-    assert backend.wait_until_agent_is_past_pre_prompt_gates("handle") is True
+    assert (
+        backend.wait_until_agent_is_past_pre_prompt_gates("handle", CLAUDE_PROFILE)
+        is True
+    )
     assert backend.keys_sent == ["Enter"]
 
 
@@ -170,5 +186,8 @@ def test_pre_prompt_gate_gives_up_but_keeps_dismissing_a_stuck_resume_modal(
 ):
     monkeypatch.setattr(pane_content.time, "sleep", lambda _seconds: None)
     backend = _ConstantCaptureBackend(RESUME_CONFIRMATION_MODAL_PANE)
-    assert backend.wait_until_agent_is_past_pre_prompt_gates("handle") is False
+    assert (
+        backend.wait_until_agent_is_past_pre_prompt_gates("handle", CLAUDE_PROFILE)
+        is False
+    )
     assert backend.keys_sent == ["Enter"] * pane_content.MAX_WAIT_ATTEMPTS

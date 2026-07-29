@@ -4,6 +4,7 @@ import pathlib
 import sys
 
 import pytest
+from harness_profile_test_helpers import CLAUDE_PROFILE_MAPPING
 
 AGENT_WRAPPER_DIRECTORY = (
     pathlib.Path(__file__).resolve().parent.parent.parent / "agent-wrapper"
@@ -34,6 +35,7 @@ def _write_launch_config(config_path, launch_command, daily_session_rotation=Fal
         json.dumps(
             {
                 "launch_command": launch_command,
+                "harness_runtime_profile": CLAUDE_PROFILE_MAPPING,
                 "heartbeat_driver_argv": None,
                 "active_hours_start": None,
                 "active_hours_end": None,
@@ -48,14 +50,14 @@ def _launch_config_path(tmp_path):
     return tmp_path / "launch-config" / "agent.json"
 
 
-def _run_supervisor_capturing_resume_flags(monkeypatch, config_file, run_results):
-    observed_resume_flags = []
+def _run_supervisor_capturing_session_argvs(monkeypatch, config_file, run_results):
+    observed_session_argvs = []
 
     def fake_run_launch_command_once(
         launch_command, heartbeat_driver_argv, tmux_target, **kwargs
     ):
-        index = len(observed_resume_flags)
-        observed_resume_flags.append(kwargs.get("resume_flag"))
+        index = len(observed_session_argvs)
+        observed_session_argvs.append(kwargs.get("session_argv"))
         if index < len(run_results):
             return run_results[index]
         raise _StopSupervising()
@@ -74,7 +76,7 @@ def _run_supervisor_capturing_resume_flags(monkeypatch, config_file, run_results
 
     with pytest.raises(_StopSupervising):
         wrapper.supervise_agent_forever("steward", str(config_file))
-    return observed_resume_flags
+    return observed_session_argvs
 
 
 def test_load_agent_launch_config_reads_json(tmp_path):
@@ -123,7 +125,7 @@ def test_supervise_resumes_the_pinned_session_on_the_next_restart(
 ):
     config_file = _launch_config_path(tmp_path)
     _write_launch_config(config_file, "claude")
-    observed = _run_supervisor_capturing_resume_flags(
+    observed = _run_supervisor_capturing_session_argvs(
         monkeypatch, config_file, [(0.0, False, False)]
     )
 
@@ -139,7 +141,7 @@ def test_supervise_resumes_the_pinned_session_on_the_next_restart(
 def test_supervise_drops_a_dead_session_and_relaunches_fresh(monkeypatch, tmp_path):
     config_file = _launch_config_path(tmp_path)
     _write_launch_config(config_file, "claude")
-    observed = _run_supervisor_capturing_resume_flags(
+    observed = _run_supervisor_capturing_session_argvs(
         monkeypatch, config_file, [(0.0, False, False), (0.0, False, True)]
     )
 
@@ -173,5 +175,5 @@ def a_pinned_conversation_is_assumed_to_exist(monkeypatch):
     monkeypatch.setitem(
         agent_launch_iterations.decide_and_persist_launch_session.__globals__,
         "session_conversation_exists",
-        lambda _identifier: True,
+        lambda _profile, _identifier: True,
     )

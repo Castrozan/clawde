@@ -125,7 +125,7 @@ def test_send_enter_uses_tmux_send_keys_when_multiplexer_unset(monkeypatch):
         return _CompletedProcessStub(0, "")
 
     monkeypatch.setattr(multiplexer_pane_capture.subprocess, "run", fake_run)
-    assert multiplexer_pane_capture.send_enter_key_to_pane("clawde:steward") is True
+    assert multiplexer_pane_capture.send_key_to_pane("clawde:steward", "Enter") is True
     assert issued["argv"] == ["tmux", "send-keys", "-t", "clawde:steward", "Enter"]
 
 
@@ -139,7 +139,7 @@ def test_send_enter_uses_herdr_send_keys_with_env_pane_id(monkeypatch):
         return _CompletedProcessStub(0, "")
 
     monkeypatch.setattr(multiplexer_pane_capture.subprocess, "run", fake_run)
-    assert multiplexer_pane_capture.send_enter_key_to_pane("clawde:steward") is True
+    assert multiplexer_pane_capture.send_key_to_pane("clawde:steward", "Enter") is True
     assert issued["argv"] == ["herdr", "pane", "send-keys", "wP:pE", "Enter"]
 
 
@@ -151,4 +151,4 @@ def test_send_enter_returns_false_when_herdr_pane_cannot_be_resolved(monkeypatch
         "run",
         lambda *_a, **_k: _CompletedProcessStub(0, '{"result":{"tabs":[]}}'),
     )
-    assert multiplexer_pane_capture.send_enter_key_to_pane("clawde:steward") is False
+    assert multiplexer_pane_capture.send_key_to_pane("clawde:steward", "Enter") is False

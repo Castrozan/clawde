@@ -13,12 +13,14 @@ in
       let
         knownChannelTypes = [ "none" ] ++ builtins.attrNames helpers.cfg.channelAdapters;
         knownAgentTypes = builtins.attrNames helpers.cfg.agentTypes;
+        knownHarnesses = builtins.attrNames helpers.cfg.harnesses;
         assertionsForAgent =
           name:
           let
             agent = helpers.cfg.agents.${name};
             effectiveAgent = helpers.effectiveAgentByName name;
             typeDefinition = helpers.cfg.agentTypes.${agent.type} or null;
+            harnessDefinition = helpers.getHarnessFor agent;
             missingRequiredParams =
               if typeDefinition == null then
                 [ ]
@@ -51,6 +53,18 @@ in
             {
               assertion = missingRequiredParams == [ ];
               message = "Agent ${name}: type '${agent.type}' requires typeParams.${agent.type} fields ${lib.concatStringsSep ", " missingRequiredParams} to be set and non-null.";
+            }
+            {
+              assertion = builtins.elem agent.harness knownHarnesses;
+              message = "Agent ${name}: harness must be one of ${lib.concatStringsSep ", " knownHarnesses} (got '${agent.harness}').";
+            }
+            {
+              assertion =
+                harnessDefinition == null
+                || builtins.elem agent.channel.type harnessDefinition.supportedChannelTypes;
+              message = "Agent ${name}: harness '${agent.harness}' cannot transport channel.type '${agent.channel.type}'; it serves ${
+                lib.concatStringsSep ", " (harnessDefinition.supportedChannelTypes or [ ])
+              }. Move the agent to a harness that carries this channel, or drop the channel.";
             }
           ];
       in

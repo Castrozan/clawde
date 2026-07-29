@@ -4,6 +4,7 @@ import pathlib
 import sys
 
 import pytest
+from harness_profile_test_helpers import CLAUDE_PROFILE_MAPPING
 
 AGENT_WRAPPER_DIRECTORY = (
     pathlib.Path(__file__).resolve().parent.parent.parent / "agent-wrapper"
@@ -38,6 +39,7 @@ def _write_launch_config_with_active_hours(config_path, active_hours_start):
                 "active_hours_end": 20,
                 "daily_session_rotation": False,
                 "tmux_session": None,
+                "harness_runtime_profile": CLAUDE_PROFILE_MAPPING,
             }
         )
     )

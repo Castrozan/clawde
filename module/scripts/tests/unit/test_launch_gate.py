@@ -6,6 +6,9 @@ sys.path.insert(
 )
 
 import launch_gate
+from harness_profile_test_helpers import make_claude_profile
+
+CLAUDE_PROFILE = make_claude_profile()
 
 
 def test_run_launch_command_to_completion_waits_for_a_run_once_command():
@@ -13,6 +16,7 @@ def test_run_launch_command_to_completion_waits_for_a_run_once_command():
         launch_gate.run_launch_command_to_completion(
             "true",
             tmux_target=None,
+            harness_runtime_profile=CLAUDE_PROFILE,
             is_resume_launch=False,
         )
     )
@@ -26,6 +30,7 @@ def test_run_launch_command_to_completion_terminates_when_it_exceeds_the_cap():
         launch_gate.run_launch_command_to_completion(
             "sleep 5",
             tmux_target=None,
+            harness_runtime_profile=CLAUDE_PROFILE,
             is_resume_launch=False,
             maximum_runtime_seconds=0,
         )

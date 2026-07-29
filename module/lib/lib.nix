@@ -7,7 +7,6 @@ let
   inherit (config.home) username homeDirectory;
 
   homeDir = homeDirectory;
-  claudeBinary = lib.getExe config.clawde.claudePackage;
 
   runtimeLocations = import ./runtime-locations.nix { inherit homeDir; };
 
@@ -34,102 +33,31 @@ let
 
   a2aPeerHelpers = import ../peer-adapters/a2a/lib.nix { inherit pkgs lib; };
 
-  getChannelAdapterFor = agent: cfg.channelAdapters.${agent.channel.type} or null;
+  agentResolution = import ./agent-resolution {
+    inherit
+      lib
+      cfg
+      agentNames
+      agentWorkspacesBaseDirectory
+      ;
+  };
 
-  getAgentTypeFor = agent: cfg.agentTypes.${agent.type} or null;
+  inherit (agentResolution)
+    getChannelAdapterFor
+    getAgentTypeFor
+    getHarnessFor
+    harnessBinaryFor
+    distinctHarnessNamesInUse
+    agentNamesOnHarness
+    agentWorkspaceDirectory
+    effectiveAgentByName
+    resolveAgentTypeInstructions
+    resolveChannelAdapterInstructions
+    resolveChannelAdapterLaunchFlag
+    resolveChannelAdapterEnvironmentSetter
+    ;
 
-  firstNonNull = preferred: fallback: if preferred != null then preferred else fallback;
-
-  agentWorkspaceDirectory =
-    name:
-    let
-      agent = cfg.agents.${name};
-      adapter = getChannelAdapterFor agent;
-      agentType = getAgentTypeFor agent;
-      typeWorkspace = if agentType != null then agentType.workspaceDirectoryFor agent else null;
-      adapterWorkspace = if adapter != null then adapter.workspaceDirectoryFor agent else null;
-    in
-    if agent.workspaceDirectory != null then
-      agent.workspaceDirectory
-    else if typeWorkspace != null then
-      typeWorkspace
-    else if adapterWorkspace != null then
-      adapterWorkspace
-    else
-      "${agentWorkspacesBaseDirectory}/${name}";
-
-  resolveChannelAdapterInstructions =
-    agent:
-    let
-      adapter = getChannelAdapterFor agent;
-    in
-    if adapter != null then adapter.instructions else "";
-
-  resolveChannelAdapterLaunchFlag =
-    agent:
-    let
-      adapter = getChannelAdapterFor agent;
-    in
-    if adapter != null then adapter.launchFlags agent else "";
-
-  resolveChannelAdapterEnvironmentSetter =
-    name: agent:
-    let
-      adapter = getChannelAdapterFor agent;
-    in
-    if adapter != null then adapter.environmentSetterFor { inherit name agent; } else "";
-
-  effectiveAgentByName =
-    name:
-    let
-      agent = cfg.agents.${name};
-      agentType = getAgentTypeFor agent;
-      typeDefault = selector: if agentType != null then selector agentType else null;
-      typeList = selector: if agentType != null then selector agentType else [ ];
-      typePersonality = if agentType != null then agentType.personalityTemplateFor agent else null;
-    in
-    agent
-    // {
-      model = firstNonNull agent.model (firstNonNull (typeDefault (t: t.defaultModel)) "sonnet");
-      permissionMode = firstNonNull agent.permissionMode (
-        firstNonNull (typeDefault (t: t.defaultPermissionMode)) "default"
-      );
-      dailySessionRotation = firstNonNull agent.dailySessionRotation (
-        firstNonNull (typeDefault (t: t.defaultDailySessionRotation)) false
-      );
-      launchOnTrigger = firstNonNull agent.launchOnTrigger (
-        firstNonNull (typeDefault (t: t.defaultLaunchOnTrigger)) false
-      );
-      launchGateIntervalSeconds = firstNonNull agent.launchGateIntervalSeconds (
-        firstNonNull (typeDefault (t: t.defaultLaunchGateIntervalSeconds)) 900
-      );
-      onDemand = firstNonNull agent.onDemand (firstNonNull (typeDefault (t: t.defaultOnDemand)) false);
-      idleTimeoutMinutes = firstNonNull agent.idleTimeoutMinutes (
-        firstNonNull (typeDefault (t: t.defaultIdleTimeoutMinutes)) 30
-      );
-      personality = firstNonNull agent.personality typePersonality;
-      heartbeatInterval = firstNonNull agent.heartbeatInterval (
-        typeDefault (t: t.defaultHeartbeatInterval)
-      );
-      heartbeatPrompt = firstNonNull agent.heartbeatPrompt (typeDefault (t: t.defaultHeartbeatPrompt));
-      heartbeatGateCommand = firstNonNull agent.heartbeatGateCommand (
-        typeDefault (t: t.defaultHeartbeatGateCommand)
-      );
-      activeHoursStart = firstNonNull agent.activeHoursStart (typeDefault (t: t.defaultActiveHoursStart));
-      activeHoursEnd = firstNonNull agent.activeHoursEnd (typeDefault (t: t.defaultActiveHoursEnd));
-      activeWeekdaysOnly = firstNonNull agent.activeWeekdaysOnly (
-        firstNonNull (typeDefault (t: t.defaultActiveWeekdaysOnly)) false
-      );
-      denyToolPatterns = (typeList (t: t.defaultDenyToolPatterns)) ++ agent.denyToolPatterns;
-      skillDirectories = agent.skillDirectories ++ (typeList (t: t.defaultSkillDirectories));
-    };
-
-  resolveAgentTypeInstructions =
-    agent:
-    let
-      agentType = getAgentTypeFor agent;
-    in
-    if agentType != null then agentType.runtimeInstructions else "";
+  harnessRuntimeProfileHelpers = import ./harness-runtime-profile.nix { inherit lib; };
 
   agentWindowSpecHelpers = import ./agent-window-spec.nix {
     inherit
@@ -143,12 +71,14 @@ let
       resolveChannelAdapterInstructions
       resolveChannelAdapterLaunchFlag
       resolveChannelAdapterEnvironmentSetter
+      getHarnessFor
       ;
+    inherit (harnessRuntimeProfileHelpers) serializeHarnessRuntimeProfile;
     inherit (runtimeLocations) agentInstructionsFile agentLaunchConfigFile;
   };
   inherit (agentWindowSpecHelpers)
     buildAllSpecificationsForOneAgent
-    buildAgentClaudeMarkdownContentByName
+    buildAgentInstructionsContentByName
     buildAgentLaunchConfigByName
     ;
 
@@ -171,7 +101,6 @@ in
 {
   inherit
     homeDir
-    claudeBinary
     defaultTmuxSessionName
     distinctTmuxSessionNames
     agentWorkspacesBaseDirectory
@@ -182,9 +111,13 @@ in
     agentWorkspaceDirectory
     getChannelAdapterFor
     getAgentTypeFor
+    getHarnessFor
+    harnessBinaryFor
+    distinctHarnessNamesInUse
+    agentNamesOnHarness
     effectiveAgentByName
     clawdeServiceSpecificationFile
-    buildAgentClaudeMarkdownContentByName
+    buildAgentInstructionsContentByName
     buildAgentLaunchConfigByName
     runtimeLocations
     ;

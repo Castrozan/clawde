@@ -4,6 +4,7 @@ import datetime
 from clawde_runtime_layout import runtime_root_directory
 from on_demand_decision import (
     agent_runs_on_demand,
+    harness_runtime_profile_for_agent,
     on_demand_configuration_for_agent,
     workspace_directory_for_agent,
 )
@@ -22,6 +23,9 @@ from session_store import (
 
 
 def describe_resume_target(agent_name: str) -> str:
+    harness_runtime_profile = harness_runtime_profile_for_agent(agent_name)
+    if harness_runtime_profile is None:
+        return "starting a fresh session"
     session_record_file_path = build_session_record_file_path(
         runtime_root_directory(), agent_name
     )
@@ -32,7 +36,9 @@ def describe_resume_target(agent_name: str) -> str:
     for candidate_identifier in [
         persisted_session_identifier
     ] + read_previous_session_identifiers(session_record_file_path):
-        if session_conversation_exists(candidate_identifier, workspace_directory):
+        if session_conversation_exists(
+            harness_runtime_profile, candidate_identifier, workspace_directory
+        ):
             return f"resuming session {candidate_identifier}"
     return "starting a fresh session"
 

@@ -46,8 +46,18 @@ def test_describe_agent_wrappers_extracts_name_and_session(monkeypatch):
         lambda config_file_path: "clawde",
     )
     assert clawde_redeploy.describe_agent_wrappers() == [
-        {"process_id": 501, "agent_name": "silver", "tmux_session": "clawde"},
-        {"process_id": 502, "agent_name": "steward", "tmux_session": "clawde"},
+        {
+            "process_id": 501,
+            "agent_name": "silver",
+            "tmux_session": "clawde",
+            "config_file_path": "/c/silver.json",
+        },
+        {
+            "process_id": 502,
+            "agent_name": "steward",
+            "tmux_session": "clawde",
+            "config_file_path": "/c/steward.json",
+        },
     ]
 
 
@@ -116,7 +126,13 @@ def test_spawn_resume_nudges_builds_session_window_argv(monkeypatch):
         clawde_redeploy.subprocess, "Popen", lambda argv: spawned_argvs.append(argv)
     )
     clawde_redeploy.spawn_resume_nudges(
-        [{"agent_name": "silver", "tmux_session": "clawde"}]
+        [
+            {
+                "agent_name": "silver",
+                "tmux_session": "clawde",
+                "config_file_path": "/c/silver.json",
+            }
+        ]
     )
     assert spawned_argvs == [
         [
@@ -126,8 +142,13 @@ def test_spawn_resume_nudges_builds_session_window_argv(monkeypatch):
             "clawde",
             "--window",
             "silver",
+            "--launch-config",
+            "/c/silver.json",
         ]
-    ]
+    ], (
+        "the nudge must be told which launch config to read, or it cannot know "
+        "which harness process and prompt markers to look for"
+    )
 
 
 def test_spawn_resume_nudges_noop_without_env(monkeypatch):

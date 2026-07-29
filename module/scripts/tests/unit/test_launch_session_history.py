@@ -9,6 +9,9 @@ sys.path.insert(
 import launch_session
 import session_persistence
 import session_store
+from harness_profile_test_helpers import make_claude_profile
+
+CLAUDE_PROFILE = make_claude_profile()
 
 AGENT_NAME = "on-demand-agent"
 
@@ -31,11 +34,11 @@ def write_record(runtime_root, session_identifier, started_on_date, previous=Non
 
 
 def create_conversation(home_directory, workspace_directory, session_identifier):
-    project_directory = session_persistence.claude_project_directory_for_workspace(
-        workspace_directory
+    transcript_file = session_persistence.session_transcript_file(
+        CLAUDE_PROFILE, session_identifier, workspace_directory
     )
-    project_directory.mkdir(parents=True, exist_ok=True)
-    (project_directory / f"{session_identifier}.jsonl").write_text("{}\n")
+    transcript_file.parent.mkdir(parents=True, exist_ok=True)
+    transcript_file.write_text("{}\n")
 
 
 def test_a_persisted_session_with_a_conversation_is_resumed(
@@ -47,11 +50,11 @@ def test_a_persisted_session_with_a_conversation_is_resumed(
     write_record(tmp_path / "clawde", "session-one", "2026-07-19")
 
     decision = launch_session.decide_and_persist_launch_session(
-        str(tmp_path / "clawde"), AGENT_NAME, False
+        str(tmp_path / "clawde"), AGENT_NAME, False, CLAUDE_PROFILE
     )
 
     assert decision.resume_previous_session is True
-    assert decision.resume_flag == "--resume session-one"
+    assert decision.session_argv == "--resume session-one"
     capsys.readouterr()
 
 
@@ -66,10 +69,10 @@ def test_a_stale_pointer_falls_back_to_a_remembered_session_with_a_conversation(
     )
 
     decision = launch_session.decide_and_persist_launch_session(
-        str(tmp_path / "clawde"), AGENT_NAME, False
+        str(tmp_path / "clawde"), AGENT_NAME, False, CLAUDE_PROFILE
     )
 
-    assert decision.resume_flag == "--resume session-old"
+    assert decision.session_argv == "--resume session-old"
 
 
 def test_a_stale_pointer_with_no_usable_history_starts_fresh(tmp_path, monkeypatch):
@@ -78,11 +81,11 @@ def test_a_stale_pointer_with_no_usable_history_starts_fresh(tmp_path, monkeypat
     write_record(tmp_path / "clawde", "session-never-used", "2026-07-19", ["also-gone"])
 
     decision = launch_session.decide_and_persist_launch_session(
-        str(tmp_path / "clawde"), AGENT_NAME, False
+        str(tmp_path / "clawde"), AGENT_NAME, False, CLAUDE_PROFILE
     )
 
     assert decision.resume_previous_session is False
-    assert decision.resume_flag.startswith("--session-id ")
+    assert decision.session_argv.startswith("--session-id ")
 
 
 def test_a_retired_session_with_a_conversation_is_remembered_after_rotation(
@@ -94,7 +97,7 @@ def test_a_retired_session_with_a_conversation_is_remembered_after_rotation(
     record_path = write_record(tmp_path / "clawde", "yesterdays-session", "2026-01-01")
 
     launch_session.decide_and_persist_launch_session(
-        str(tmp_path / "clawde"), AGENT_NAME, True
+        str(tmp_path / "clawde"), AGENT_NAME, True, CLAUDE_PROFILE
     )
 
     assert json.loads(record_path.read_text())["previous_session_identifiers"] == [
@@ -110,7 +113,7 @@ def test_a_retired_phantom_session_is_not_remembered_after_rotation(
     record_path = write_record(tmp_path / "clawde", "phantom-session", "2026-01-01")
 
     launch_session.decide_and_persist_launch_session(
-        str(tmp_path / "clawde"), AGENT_NAME, True
+        str(tmp_path / "clawde"), AGENT_NAME, True, CLAUDE_PROFILE
     )
 
     assert json.loads(record_path.read_text())["previous_session_identifiers"] == []
@@ -127,10 +130,10 @@ def test_a_phantom_pointer_does_not_bury_the_good_session_in_history(
     )
 
     decision = launch_session.decide_and_persist_launch_session(
-        str(tmp_path / "clawde"), AGENT_NAME, False
+        str(tmp_path / "clawde"), AGENT_NAME, False, CLAUDE_PROFILE
     )
 
-    assert decision.resume_flag == "--resume good-session"
+    assert decision.session_argv == "--resume good-session"
     assert (
         "phantom-latest"
         not in json.loads(record_path.read_text())["previous_session_identifiers"]
@@ -146,7 +149,7 @@ def test_daily_rotation_still_starts_fresh_despite_a_resumable_history(
     write_record(tmp_path / "clawde", "session-old", "2026-01-01")
 
     decision = launch_session.decide_and_persist_launch_session(
-        str(tmp_path / "clawde"), AGENT_NAME, True
+        str(tmp_path / "clawde"), AGENT_NAME, True, CLAUDE_PROFILE
     )
 
     assert decision.rotating_session is True

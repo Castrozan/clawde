@@ -12,6 +12,7 @@ from on_demand_lease import (
     latest_activity_time,
     read_lease_started_at,
 )
+from harness_runtime_profile import load_harness_runtime_profile_from_launch_config
 from session_persistence import session_conversation_modified_at
 from session_store import build_session_record_file_path, read_persisted_session_record
 
@@ -51,14 +52,28 @@ def workspace_directory_for_agent(agent_name: str) -> str | None:
         return None
 
 
+def harness_runtime_profile_for_agent(agent_name: str):
+    try:
+        return load_harness_runtime_profile_from_launch_config(
+            launch_config_path_for_agent(agent_name)
+        )
+    except (OSError, ValueError, KeyError):
+        return None
+
+
 def last_conversation_activity_for_agent(
     agent_name: str,
 ) -> datetime.datetime | None:
+    harness_runtime_profile = harness_runtime_profile_for_agent(agent_name)
+    if harness_runtime_profile is None:
+        return None
     session_identifier, _started_on_date = read_persisted_session_record(
         build_session_record_file_path(runtime_root_directory(), agent_name)
     )
     return session_conversation_modified_at(
-        session_identifier, workspace_directory_for_agent(agent_name)
+        harness_runtime_profile,
+        session_identifier,
+        workspace_directory_for_agent(agent_name),
     )
 
 

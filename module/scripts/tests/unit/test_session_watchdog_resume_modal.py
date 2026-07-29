@@ -2,6 +2,8 @@ import importlib.util
 import pathlib
 import sys
 
+from harness_profile_test_helpers import make_claude_profile
+
 AGENT_WRAPPER_DIRECTORY = (
     pathlib.Path(__file__).resolve().parent.parent.parent / "agent-wrapper"
 )
@@ -19,6 +21,8 @@ def _load_agent_wrapper_module(module_name: str):
 
 
 session_watchdog = _load_agent_wrapper_module("session_watchdog")
+
+CLAUDE_PROFILE = make_claude_profile()
 
 IDLE_REPL_PANE = "● Heartbeat scheduled, nothing pending - standing by.\n❯\n"
 RESUME_CONFIRMATION_MODAL_PANE = (
@@ -42,18 +46,19 @@ def test_resume_launch_dismisses_the_resume_confirmation_modal_then_stops(monkey
     )
     enter_key_sends = []
 
-    def record_enter_key(tmux_target):
+    def record_enter_key(tmux_target, key):
         enter_key_sends.append(tmux_target)
         return True
 
-    monkeypatch.setattr(session_watchdog, "send_enter_key_to_pane", record_enter_key)
+    monkeypatch.setattr(session_watchdog, "send_key_to_pane", record_enter_key)
 
     _runtime_seconds, was_stuck_kill, _resume_session_missing = (
         session_watchdog.run_launch_command_once(
             "sleep 0.3",
             None,
             "clawde:ai-first-initiative",
-            resume_flag="--resume pinned-session-id",
+            CLAUDE_PROFILE,
+            session_argv="--resume pinned-session-id",
             is_resume_launch=True,
         )
     )
@@ -75,12 +80,12 @@ def test_resume_modal_watch_disarms_after_the_bounded_poll_budget(monkeypatch):
     enter_key_sends = []
     monkeypatch.setattr(
         session_watchdog,
-        "send_enter_key_to_pane",
-        lambda tmux_target: enter_key_sends.append(tmux_target) or True,
+        "send_key_to_pane",
+        lambda tmux_target, key: enter_key_sends.append(tmux_target) or True,
     )
 
     def terminate_and_kill(root_process_id):
-        session_watchdog.os.kill(root_process_id, session_watchdog.signal.SIGKILL)
+        session_watchdog.os.kill(root_process_id, 9)
 
     monkeypatch.setattr(session_watchdog, "terminate_process_tree", terminate_and_kill)
 
@@ -89,7 +94,8 @@ def test_resume_modal_watch_disarms_after_the_bounded_poll_budget(monkeypatch):
             "sleep 30",
             None,
             "clawde:ai-first-initiative",
-            resume_flag="--resume pinned-session-id",
+            CLAUDE_PROFILE,
+            session_argv="--resume pinned-session-id",
             is_resume_launch=True,
         )
     )
@@ -113,12 +119,12 @@ def test_non_resume_launch_never_presses_enter_into_the_pane(monkeypatch):
     enter_key_sends = []
     monkeypatch.setattr(
         session_watchdog,
-        "send_enter_key_to_pane",
-        lambda tmux_target: enter_key_sends.append(tmux_target) or True,
+        "send_key_to_pane",
+        lambda tmux_target, key: enter_key_sends.append(tmux_target) or True,
     )
 
     def terminate_and_kill(root_process_id):
-        session_watchdog.os.kill(root_process_id, session_watchdog.signal.SIGKILL)
+        session_watchdog.os.kill(root_process_id, 9)
 
     monkeypatch.setattr(session_watchdog, "terminate_process_tree", terminate_and_kill)
 
@@ -127,6 +133,7 @@ def test_non_resume_launch_never_presses_enter_into_the_pane(monkeypatch):
             "sleep 30",
             None,
             "clawde:golden",
+            CLAUDE_PROFILE,
             is_resume_launch=False,
         )
     )

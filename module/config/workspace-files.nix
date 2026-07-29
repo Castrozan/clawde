@@ -7,62 +7,42 @@
 let
   helpers = import ../lib/lib.nix { inherit pkgs config lib; };
   inherit (helpers)
-    cfg
     hasAgents
     homeDir
     agentNames
     agentWorkspaceDirectory
     effectiveAgentByName
+    getHarnessFor
+    getChannelAdapterFor
     ;
 
   workspaceRelativeToHome = name: lib.removePrefix "${homeDir}/" (agentWorkspaceDirectory name);
 
-  enforceDiscordReplyStopHook = pkgs.writeShellScript "enforce-discord-reply-stop-hook" ''
-    exec ${pkgs.python312}/bin/python3 ${../channel-adapters/discord/scripts/enforce-discord-reply-stop-hook.py} "$@"
-  '';
+  resolveChannelWorkspaceSettings =
+    name: agent:
+    let
+      adapter = getChannelAdapterFor agent;
+    in
+    if adapter != null then adapter.workspaceSettingsFor { inherit name agent; } else { };
 
-  agentIsDiscord = name: cfg.agents.${name}.channel.type == "discord";
-
-  agentSettings =
+  harnessWorkspaceFiles =
     name:
     let
       agent = effectiveAgentByName name;
-      denySettings = lib.optionalAttrs (agent.denyToolPatterns != [ ]) {
-        permissions.deny = agent.denyToolPatterns;
-      };
-      discordReplyEnforcementSettings = lib.optionalAttrs (agentIsDiscord name) {
-        hooks.Stop = [
-          {
-            hooks = [
-              {
-                type = "command";
-                command = "${enforceDiscordReplyStopHook}";
-              }
-            ];
-          }
-        ];
-      };
-      discordPluginEnableSettings = lib.optionalAttrs (agentIsDiscord name) {
-        enabledPlugins."discord@claude-plugins-official" = true;
-      };
     in
-    lib.foldl' lib.recursiveUpdate { } [
-      denySettings
-      discordReplyEnforcementSettings
-      discordPluginEnableSettings
-    ];
+    (getHarnessFor agent).workspaceFilesFor {
+      inherit name agent;
+      workspaceDirectory = agentWorkspaceDirectory name;
+      workspaceRelativeToHome = workspaceRelativeToHome name;
+      channelWorkspaceSettings = resolveChannelWorkspaceSettings name agent;
+    };
 
-  agentWorkspaceSettingsFiles = lib.listToAttrs (
-    map (name: {
-      name = "${workspaceRelativeToHome name}/.claude/settings.json";
-      value = {
-        text = builtins.toJSON (agentSettings name);
-      };
-    }) (builtins.filter (name: agentSettings name != { }) agentNames)
-  );
+  allAgentWorkspaceFiles = lib.foldl' (
+    accumulated: name: accumulated // harnessWorkspaceFiles name
+  ) { } agentNames;
 in
 {
   config = lib.mkIf hasAgents {
-    home.file = agentWorkspaceSettingsFiles;
+    home.file = allAgentWorkspaceFiles;
   };
 }

@@ -2,6 +2,8 @@ import importlib.util
 import pathlib
 import sys
 
+from harness_profile_test_helpers import make_claude_profile
+
 AGENT_WRAPPER_DIRECTORY = (
     pathlib.Path(__file__).resolve().parent.parent.parent / "agent-wrapper"
 )
@@ -20,6 +22,8 @@ def _load_agent_wrapper_module(module_name: str):
 
 session_watchdog = _load_agent_wrapper_module("session_watchdog")
 
+CLAUDE_PROFILE = make_claude_profile()
+
 IDLE_REPL_PANE = "● Heartbeat scheduled, nothing pending - standing by.\n❯\n"
 
 
@@ -37,7 +41,7 @@ def test_watchdog_rotates_long_running_session_at_day_boundary(monkeypatch):
 
     def terminate_and_record(root_process_id: int) -> None:
         terminated_process_ids.append(root_process_id)
-        session_watchdog.os.kill(root_process_id, session_watchdog.signal.SIGKILL)
+        session_watchdog.os.kill(root_process_id, 9)
 
     monkeypatch.setattr(
         session_watchdog, "terminate_process_tree", terminate_and_record
@@ -47,6 +51,7 @@ def test_watchdog_rotates_long_running_session_at_day_boundary(monkeypatch):
             "sleep 30",
             None,
             "clawde:golden",
+            CLAUDE_PROFILE,
             daily_session_rotation=True,
         )
     )
@@ -81,6 +86,7 @@ def test_watchdog_leaves_session_running_when_rotation_disabled(monkeypatch):
         "true",
         None,
         "clawde:golden",
+        CLAUDE_PROFILE,
         daily_session_rotation=False,
     )
     assert terminated_process_ids == [], (

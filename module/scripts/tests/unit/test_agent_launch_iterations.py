@@ -7,11 +7,14 @@ sys.path.insert(
 )
 
 import agent_launch_iterations
+from harness_profile_test_helpers import make_claude_profile
+
+CLAUDE_PROFILE = make_claude_profile()
 
 
 def _fake_launch_session():
     return types.SimpleNamespace(
-        resume_flag="--resume abc",
+        session_argv="--resume abc",
         resume_previous_session=True,
         rotating_session=False,
         session_record_file_path="/tmp/steward-session.json",
@@ -43,7 +46,7 @@ def test_triggered_iteration_launches_once_and_never_sleeps(monkeypatch):
     launches, slept = _patch_common(monkeypatch)
 
     agent_launch_iterations.run_triggered_launch_iteration(
-        "steward", "claude --print x", None, "/root", False
+        "steward", "claude --print x", None, "/root", False, CLAUDE_PROFILE
     )
 
     assert launches == ["claude --print x"]
@@ -62,7 +65,7 @@ def test_triggered_iteration_drops_only_the_missing_resume_session(monkeypatch):
     )
 
     agent_launch_iterations.run_triggered_launch_iteration(
-        "steward", "claude --print x", None, "/root", False
+        "steward", "claude --print x", None, "/root", False, CLAUDE_PROFILE
     )
 
     assert forgotten == [("/tmp/steward-session.json", "abc")]

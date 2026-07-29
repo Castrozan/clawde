@@ -11,11 +11,13 @@
   resolveChannelAdapterInstructions,
   resolveChannelAdapterLaunchFlag,
   resolveChannelAdapterEnvironmentSetter,
+  getHarnessFor,
+  serializeHarnessRuntimeProfile,
 }:
 let
-  claudeResolvedFromAgentRuntimePathForRebuildStability = "claude";
+  sessionArgvShellExpansion = "\${CLAWDE_SESSION_ARGV:-}";
 
-  buildAgentClaudeMarkdownContent = agent: ''
+  buildAgentInstructionsContent = agent: ''
     ${agent.personality}
 
     ${clawdeRuntimeInstructions}
@@ -29,26 +31,30 @@ let
     ${agent.additionalInstructions}
   '';
 
-  buildAgentClaudeMarkdownContentByName =
-    name: buildAgentClaudeMarkdownContent (effectiveAgentByName name);
+  buildAgentInstructionsContentByName =
+    name: buildAgentInstructionsContent (effectiveAgentByName name);
 
   buildAgentLaunchCommand =
     name: agent:
     let
-      workspace = agentWorkspaceDirectory name;
+      workspaceDirectory = agentWorkspaceDirectory name;
       environmentSetter = resolveChannelAdapterEnvironmentSetter name agent;
-      channelFlag = resolveChannelAdapterLaunchFlag agent;
-      modelFlag = "--model ${agent.model}";
-      nameFlag = "--name ${name}";
-      permissionModeFlag = "--permission-mode ${agent.permissionMode}";
-      skillDirFlags = lib.concatMapStringsSep " " (dir: "--add-dir ${dir}") agent.skillDirectories;
-      appendSystemPromptFlag = "--append-system-prompt \"$(cat ${agentInstructionsFile name})\"";
-      mcpConfigFlag = lib.optionalString (
-        agent.mcpConfigFile != null
-      ) "--strict-mcp-config --mcp-config ${agent.mcpConfigFile} ";
-      runOncePrintFlag = lib.optionalString agent.launchOnTrigger "--print ${lib.escapeShellArg agent.heartbeatPrompt} ";
+      harness = getHarnessFor agent;
+      harnessLaunchCommand =
+        if agent.launchOnTrigger then
+          harness.buildRunOnceCommandFor {
+            inherit name agent workspaceDirectory;
+            instructionsFile = agentInstructionsFile name;
+          }
+        else
+          harness.buildLaunchCommandFor {
+            inherit name agent workspaceDirectory;
+            instructionsFile = agentInstructionsFile name;
+            channelLaunchFlags = resolveChannelAdapterLaunchFlag agent;
+            inherit sessionArgvShellExpansion;
+          };
     in
-    "cd ${workspace} && ${environmentSetter}${claudeResolvedFromAgentRuntimePathForRebuildStability} ${runOncePrintFlag}\${CLAWDE_RESUME_FLAG:-} ${channelFlag} ${modelFlag} ${nameFlag} ${permissionModeFlag} ${mcpConfigFlag}${appendSystemPromptFlag} ${skillDirFlags}";
+    "cd ${workspaceDirectory} && ${environmentSetter}${harnessLaunchCommand}";
 
   buildHeartbeatDriverArgv =
     name: agent:
@@ -59,6 +65,8 @@ let
       agent.tmuxSession
       "--window"
       name
+      "--launch-config"
+      (agentLaunchConfigFile name)
       "--interval"
       agent.heartbeatInterval
       "--prompt"
@@ -69,25 +77,31 @@ let
       agent.heartbeatGateCommand
     ];
 
-  buildAgentLaunchConfig = name: agent: {
-    launch_command = buildAgentLaunchCommand name agent;
-    heartbeat_driver_argv =
-      if (!agent.launchOnTrigger && agent.heartbeatInterval != null) then
-        buildHeartbeatDriverArgv name agent
-      else
-        null;
-    launch_gate_command = if agent.launchOnTrigger then agent.heartbeatGateCommand else null;
-    launch_gate_interval_seconds =
-      if agent.launchOnTrigger then agent.launchGateIntervalSeconds else null;
-    active_hours_start = agent.activeHoursStart;
-    active_hours_end = agent.activeHoursEnd;
-    active_weekdays_only = agent.activeWeekdaysOnly;
-    daily_session_rotation = agent.dailySessionRotation;
-    on_demand = agent.onDemand;
-    idle_timeout_minutes = agent.idleTimeoutMinutes;
-    workspace_directory = agentWorkspaceDirectory name;
-    tmux_session = agent.tmuxSession;
-  };
+  buildAgentLaunchConfig =
+    name: agent:
+    let
+      inherit (getHarnessFor agent) runtimeProfile;
+    in
+    {
+      launch_command = buildAgentLaunchCommand name agent;
+      harness_runtime_profile = serializeHarnessRuntimeProfile agent.harness runtimeProfile;
+      heartbeat_driver_argv =
+        if (!agent.launchOnTrigger && agent.heartbeatInterval != null) then
+          buildHeartbeatDriverArgv name agent
+        else
+          null;
+      launch_gate_command = if agent.launchOnTrigger then agent.heartbeatGateCommand else null;
+      launch_gate_interval_seconds =
+        if agent.launchOnTrigger then agent.launchGateIntervalSeconds else null;
+      active_hours_start = agent.activeHoursStart;
+      active_hours_end = agent.activeHoursEnd;
+      active_weekdays_only = agent.activeWeekdaysOnly;
+      daily_session_rotation = agent.dailySessionRotation;
+      on_demand = agent.onDemand;
+      idle_timeout_minutes = agent.idleTimeoutMinutes;
+      workspace_directory = agentWorkspaceDirectory name;
+      tmux_session = agent.tmuxSession;
+    };
 
   buildAgentLaunchConfigByName = name: buildAgentLaunchConfig name (effectiveAgentByName name);
 
@@ -97,6 +111,8 @@ let
       workspaceDirectory = agentWorkspaceDirectory name;
       execPythonWrapperInvocation = lib.concatStringsSep " " [
         "exec"
+        "env"
+        "PYTHONPATH=${../scripts/harness}"
         "${pkgs.python312}/bin/python3"
         "${../scripts/agent-wrapper}/wrapper.py"
         "--agent-name ${lib.escapeShellArg name}"
@@ -118,15 +134,16 @@ let
     name:
     let
       agent = effectiveAgentByName name;
+      outputLinePattern = (getHarnessFor agent).meaningfulOutputLinePattern;
       mainSpec = buildAgentSpecification name agent;
-      peerSpecs = a2aPeerHelpers.peerWindowSpecificationsForAgent name agent;
+      peerSpecs = a2aPeerHelpers.peerWindowSpecificationsForAgent name agent outputLinePattern;
     in
     [ mainSpec ] ++ peerSpecs;
 in
 {
   inherit
     buildAllSpecificationsForOneAgent
-    buildAgentClaudeMarkdownContentByName
+    buildAgentInstructionsContentByName
     buildAgentLaunchConfigByName
     ;
 }

@@ -60,6 +60,7 @@ def describe_agent_wrappers() -> list[dict]:
                 "process_id": process_id,
                 "agent_name": agent_name_match.group(1),
                 "tmux_session": tmux_session,
+                "config_file_path": config_file_match.group(1),
             }
         )
     return agent_wrappers
@@ -114,6 +115,8 @@ def spawn_resume_nudges(agent_wrappers: list[dict]) -> None:
                 agent_wrapper["tmux_session"],
                 "--window",
                 agent_wrapper["agent_name"],
+                "--launch-config",
+                agent_wrapper["config_file_path"],
             ]
         )
 
@@ -149,8 +152,7 @@ def main() -> None:
         return
     print(
         f"Signaling {len(agent_wrappers)} clawde agent wrapper(s) to restart and "
-        "resume each agent's own pinned session (claude --resume <session id>), "
-        "detached after a short grace delay."
+        "resume each agent's own previous session, detached after a short grace delay."
     )
     sys.stdout.flush()
     detach_into_background_daemon_escaping_caller_process_tree()

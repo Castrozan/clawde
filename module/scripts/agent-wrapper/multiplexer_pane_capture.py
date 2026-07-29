@@ -100,26 +100,26 @@ def capture_pane_content(tmux_target: str) -> str | None:
     return capture_tmux_pane_content(tmux_target)
 
 
-def send_enter_key_to_tmux_pane(tmux_target: str) -> bool:
+def send_key_to_tmux_pane(tmux_target: str, key: str) -> bool:
     result = subprocess.run(
-        ["tmux", "send-keys", "-t", tmux_target, "Enter"],
+        ["tmux", "send-keys", "-t", tmux_target, key],
         capture_output=True,
         text=True,
     )
     return result.returncode == 0
 
 
-def send_enter_key_to_herdr_pane(tmux_target: str) -> bool:
+def send_key_to_herdr_pane(tmux_target: str, key: str) -> bool:
     pane_id = os.environ.get(
         HERDR_PANE_ID_ENVIRONMENT_VARIABLE
     ) or resolve_herdr_pane_id_for_agent(agent_name_from_tmux_target(tmux_target))
     if not pane_id:
         return False
-    result = run_herdr_command("pane", "send-keys", pane_id, "Enter")
+    result = run_herdr_command("pane", "send-keys", pane_id, key)
     return result.returncode == 0
 
 
-def send_enter_key_to_pane(tmux_target: str) -> bool:
+def send_key_to_pane(tmux_target: str, key: str) -> bool:
     if os.environ.get(MULTIPLEXER_ENVIRONMENT_VARIABLE) == HERDR_MULTIPLEXER_VALUE:
-        return send_enter_key_to_herdr_pane(tmux_target)
-    return send_enter_key_to_tmux_pane(tmux_target)
+        return send_key_to_herdr_pane(tmux_target, key)
+    return send_key_to_tmux_pane(tmux_target, key)

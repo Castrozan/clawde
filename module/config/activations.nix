@@ -11,62 +11,52 @@ let
     hasAgents
     agentNames
     agentWorkspaceDirectory
-    claudeBinary
+    harnessBinaryFor
     getChannelAdapterFor
     getAgentTypeFor
+    getHarnessFor
+    distinctHarnessNamesInUse
     ;
 
-  perAgentChannelAdapterActivationLines = lib.concatMapStringsSep "\n" (
-    name:
-    let
-      agent = cfg.agents.${name};
-      adapter = getChannelAdapterFor agent;
-      workspaceDirectory = agentWorkspaceDirectory name;
-    in
-    if adapter != null then
-      adapter.agentActivationScriptFor {
-        inherit
-          name
-          agent
-          workspaceDirectory
-          claudeBinary
-          ;
-      }
-    else
-      ""
-  ) agentNames;
+  perAgentActivationLines =
+    resolveProvider: providerSelector:
+    lib.concatMapStringsSep "\n" (
+      name:
+      let
+        agent = cfg.agents.${name};
+        provider = resolveProvider agent;
+      in
+      if provider != null then
+        (providerSelector provider) {
+          inherit name agent;
+          workspaceDirectory = agentWorkspaceDirectory name;
+          harnessBinary = harnessBinaryFor agent;
+        }
+      else
+        ""
+    ) agentNames;
 
-  runAllChannelAdapterAgentActivations = pkgs.writeShellScript "clawde-run-all-channel-adapter-agent-activations" perAgentChannelAdapterActivationLines;
+  runAllChannelAdapterAgentActivations =
+    pkgs.writeShellScript "clawde-run-all-channel-adapter-agent-activations"
+      (perAgentActivationLines getChannelAdapterFor (provider: provider.agentActivationScriptFor));
 
-  perAgentTypeActivationLines = lib.concatMapStringsSep "\n" (
-    name:
-    let
-      agent = cfg.agents.${name};
-      agentType = getAgentTypeFor agent;
-      workspaceDirectory = agentWorkspaceDirectory name;
-    in
-    if agentType != null then
-      agentType.agentActivationScriptFor {
-        inherit
-          name
-          agent
-          workspaceDirectory
-          claudeBinary
-          ;
-      }
-    else
-      ""
-  ) agentNames;
+  runAllAgentTypeActivations = pkgs.writeShellScript "clawde-run-all-agent-type-activations" (
+    perAgentActivationLines getAgentTypeFor (provider: provider.agentActivationScriptFor)
+  );
 
-  runAllAgentTypeActivations = pkgs.writeShellScript "clawde-run-all-agent-type-activations" perAgentTypeActivationLines;
+  runAllHarnessAgentActivations = pkgs.writeShellScript "clawde-run-all-harness-agent-activations" (
+    perAgentActivationLines getHarnessFor (provider: provider.agentActivationScriptFor)
+  );
 
-  agentTypePreActivationLines = lib.concatMapStringsSep "\n" (
-    typeName:
-    let
-      agentType = cfg.agentTypes.${typeName};
-    in
-    if agentType.preActivation != null then agentType.preActivation else ""
-  ) (builtins.attrNames cfg.agentTypes);
+  preActivationLinesFor =
+    registry: registeredNames:
+    lib.concatMapStringsSep "\n" (
+      entryName:
+      let
+        entry = registry.${entryName};
+      in
+      if entry.preActivation != null then entry.preActivation else ""
+    ) registeredNames;
 
   seedOneMemoryBridgeScript = pkgs.writeShellScript "seed-one-memory-bridge" (
     builtins.readFile ../scripts/seed-memory-bridge.sh
@@ -77,25 +67,21 @@ let
       name: "${seedOneMemoryBridgeScript} ${lib.escapeShellArg (agentWorkspaceDirectory name)}"
     ) agentNames
   );
-
-  channelAdapterPreActivationLines = lib.concatMapStringsSep "\n" (
-    adapterName:
-    let
-      adapter = cfg.channelAdapters.${adapterName};
-    in
-    if adapter.preActivation != null then adapter.preActivation else ""
-  ) (builtins.attrNames cfg.channelAdapters);
 in
 {
   config = lib.mkIf hasAgents {
     home.activation = {
-      runChannelAdapterPreActivations = lib.hm.dag.entryAfter [
-        "writeBoundary"
-      ] channelAdapterPreActivationLines;
+      runChannelAdapterPreActivations = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+        preActivationLinesFor cfg.channelAdapters (builtins.attrNames cfg.channelAdapters)
+      );
 
-      runAgentTypePreActivations = lib.hm.dag.entryAfter [
-        "writeBoundary"
-      ] agentTypePreActivationLines;
+      runAgentTypePreActivations = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+        preActivationLinesFor cfg.agentTypes (builtins.attrNames cfg.agentTypes)
+      );
+
+      runHarnessPreActivations = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+        preActivationLinesFor cfg.harnesses distinctHarnessNamesInUse
+      );
 
       runChannelAdapterAgentActivations = lib.hm.dag.entryAfter [ "runChannelAdapterPreActivations" ] ''
         run ${runAllChannelAdapterAgentActivations}
@@ -105,11 +91,16 @@ in
         run ${runAllAgentTypeActivations}
       '';
 
+      runHarnessAgentActivations = lib.hm.dag.entryAfter [ "runHarnessPreActivations" ] ''
+        run ${runAllHarnessAgentActivations}
+      '';
+
       seedAgentMemoryBridges =
         lib.hm.dag.entryAfter
           [
             "runChannelAdapterAgentActivations"
             "runAgentTypeActivations"
+            "runHarnessAgentActivations"
           ]
           ''
             run ${seedAllMemoryBridges}

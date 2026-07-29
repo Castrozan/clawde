@@ -2,6 +2,8 @@ import importlib.util
 import pathlib
 import sys
 
+from harness_profile_test_helpers import make_claude_profile
+
 AGENT_WRAPPER_DIRECTORY = (
     pathlib.Path(__file__).resolve().parent.parent.parent / "agent-wrapper"
 )
@@ -18,85 +20,22 @@ def _load_agent_wrapper_module(module_name: str):
     return module
 
 
-stuck_indicators = _load_agent_wrapper_module("stuck_indicators")
 session_watchdog = _load_agent_wrapper_module("session_watchdog")
 
-IDLE_REPL_PANE = "● Heartbeat scheduled, nothing pending - standing by.\n❯\n"
+CLAUDE_PROFILE = make_claude_profile()
+
 AUTH_FAILURE_MODAL_PANE = (
     "Please run /login · API Error: 401 Invalid authentication credentials\n"
 )
-USAGE_LIMIT_MODAL_PANE = (
-    "What do you want to do?\n"
-    " ❯ Adjust monthly spend limit\n"
-    "   Wait for limit to reset\n"
-)
-AGENT_DISCUSSING_AUTH_ERROR_THEN_IDLE_PANE = (
-    "I see the steward pane shows API Error: 401 / Please run /login - that is the\n"
-    "auth-stuck state we are fixing.\n❯\n"
-)
 
 
-def test_pane_is_at_idle_repl_prompt_true_for_idle_pane():
-    assert stuck_indicators.pane_is_at_idle_repl_prompt(IDLE_REPL_PANE) is True
+def _record_terminations(monkeypatch, terminated_process_ids):
+    def terminate_and_record(root_process_id: int) -> None:
+        terminated_process_ids.append(root_process_id)
+        session_watchdog.os.kill(root_process_id, 9)
 
-
-def test_pane_is_at_idle_repl_prompt_false_for_frozen_modal():
-    assert (
-        stuck_indicators.pane_is_at_idle_repl_prompt(AUTH_FAILURE_MODAL_PANE) is False
-    )
-
-
-def test_pane_is_at_idle_repl_prompt_false_at_onboarding_even_with_prompt_glyph():
-    onboarding_pane = "Select login method\n ❯ Claude account with subscription\n"
-    assert stuck_indicators.pane_is_at_idle_repl_prompt(onboarding_pane) is False
-
-
-def test_idle_repl_pane_is_never_stuck_evidence_even_when_frozen():
-    assert (
-        stuck_indicators.pane_poll_is_stuck_evidence(IDLE_REPL_PANE, IDLE_REPL_PANE)
-        is False
-    )
-
-
-def test_agent_discussing_auth_error_but_back_at_prompt_is_not_stuck():
-    assert (
-        stuck_indicators.pane_poll_is_stuck_evidence(
-            AGENT_DISCUSSING_AUTH_ERROR_THEN_IDLE_PANE,
-            AGENT_DISCUSSING_AUTH_ERROR_THEN_IDLE_PANE,
-        )
-        is False
-    )
-
-
-def test_progressing_pane_is_not_stuck_even_without_prompt():
-    assert (
-        stuck_indicators.pane_poll_is_stuck_evidence(
-            "Running step 2 of 5... 41s\n", "Running step 2 of 5... 12s\n"
-        )
-        is False
-    )
-
-
-def test_frozen_non_idle_pane_is_stuck_evidence():
-    assert (
-        stuck_indicators.pane_poll_is_stuck_evidence(
-            AUTH_FAILURE_MODAL_PANE, AUTH_FAILURE_MODAL_PANE
-        )
-        is True
-    )
-
-
-def test_first_poll_without_previous_capture_is_not_stuck_evidence():
-    assert (
-        stuck_indicators.pane_poll_is_stuck_evidence(AUTH_FAILURE_MODAL_PANE, None)
-        is False
-    )
-
-
-def test_usage_limit_modal_is_stuck_evidence_on_first_sight():
-    assert (
-        stuck_indicators.pane_poll_is_stuck_evidence(USAGE_LIMIT_MODAL_PANE, None)
-        is True
+    monkeypatch.setattr(
+        session_watchdog, "terminate_process_tree", terminate_and_record
     )
 
 
@@ -108,19 +47,14 @@ def test_watchdog_terminates_session_when_pane_is_frozen_and_not_idle(monkeypatc
         lambda _tmux_target: AUTH_FAILURE_MODAL_PANE,
     )
     terminated_process_ids: list[int] = []
+    _record_terminations(monkeypatch, terminated_process_ids)
 
-    def terminate_and_record(root_process_id: int) -> None:
-        terminated_process_ids.append(root_process_id)
-        session_watchdog.os.kill(root_process_id, session_watchdog.signal.SIGKILL)
-
-    monkeypatch.setattr(
-        session_watchdog, "terminate_process_tree", terminate_and_record
-    )
     _runtime_seconds, was_stuck_kill, _resume_session_missing = (
         session_watchdog.run_launch_command_once(
             "sleep 30",
             None,
             "clawde:golden",
+            CLAUDE_PROFILE,
         )
     )
     assert was_stuck_kill is True
@@ -133,19 +67,14 @@ def test_watchdog_terminates_when_heartbeat_driver_gives_up_on_repl(monkeypatch)
         session_watchdog, "capture_pane_content", lambda _tmux_target: None
     )
     terminated_process_ids: list[int] = []
+    _record_terminations(monkeypatch, terminated_process_ids)
 
-    def terminate_and_record(root_process_id: int) -> None:
-        terminated_process_ids.append(root_process_id)
-        session_watchdog.os.kill(root_process_id, session_watchdog.signal.SIGKILL)
-
-    monkeypatch.setattr(
-        session_watchdog, "terminate_process_tree", terminate_and_record
-    )
     _runtime_seconds, was_stuck_kill, _resume_session_missing = (
         session_watchdog.run_launch_command_once(
             "sleep 30",
             ["bash", "-c", "exit 1"],
             "clawde:steward",
+            CLAUDE_PROFILE,
         )
     )
     assert was_stuck_kill is True, (
@@ -156,25 +85,43 @@ def test_watchdog_terminates_when_heartbeat_driver_gives_up_on_repl(monkeypatch)
     assert len(terminated_process_ids) == 1
 
 
-def test_resume_flag_is_exposed_verbatim_to_launch_command(tmp_path):
-    captured_flag = tmp_path / "flag.txt"
+def test_session_argv_is_exposed_verbatim_to_launch_command(tmp_path):
+    captured_argv = tmp_path / "argv.txt"
     session_watchdog.run_launch_command_once(
-        f'printf "%s" "$CLAWDE_RESUME_FLAG" > "{captured_flag}"',
+        f'printf "%s" "$CLAWDE_SESSION_ARGV" > "{captured_argv}"',
         None,
         None,
-        resume_flag="--resume pinned-session-id",
+        CLAUDE_PROFILE,
+        session_argv="--resume pinned-session-id",
     )
-    assert captured_flag.read_text() == "--resume pinned-session-id"
+    assert captured_argv.read_text() == "--resume pinned-session-id"
 
 
-def test_default_launch_leaves_resume_flag_empty(tmp_path):
-    captured_flag = tmp_path / "flag.txt"
+def test_default_launch_leaves_session_argv_empty(tmp_path):
+    captured_argv = tmp_path / "argv.txt"
     session_watchdog.run_launch_command_once(
-        f'printf "%s" "$CLAWDE_RESUME_FLAG" > "{captured_flag}"',
+        f'printf "%s" "$CLAWDE_SESSION_ARGV" > "{captured_argv}"',
         None,
         None,
+        CLAUDE_PROFILE,
     )
-    assert captured_flag.read_text() == ""
+    assert captured_argv.read_text() == ""
+
+
+def test_agent_name_is_exported_as_the_autonomous_agent_marker(tmp_path):
+    captured_name = tmp_path / "name.txt"
+    session_watchdog.run_launch_command_once(
+        f'printf "%s" "$CLAWDE_AGENT_NAME" > "{captured_name}"',
+        None,
+        None,
+        CLAUDE_PROFILE,
+        agent_name="steward",
+    )
+    assert captured_name.read_text() == "steward", (
+        "a codex agent's fresh launch has an empty session argv, so the agent name "
+        "is the only always-set marker downstream tooling can key off to tell an "
+        "autonomous agent session from an interactive one"
+    )
 
 
 def test_register_child_pid_callback_receives_live_then_none(tmp_path):
@@ -183,6 +130,7 @@ def test_register_child_pid_callback_receives_live_then_none(tmp_path):
         "true",
         None,
         None,
+        CLAUDE_PROFILE,
         register_child_pid=observed_process_ids.append,
     )
     assert len(observed_process_ids) == 2

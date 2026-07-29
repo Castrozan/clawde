@@ -19,12 +19,13 @@ from redeploy_signals import (
     install_exit_signal_handlers,
     install_redeploy_signal_handler,
 )
+from harness_runtime_profile import HarnessRuntimeProfile
+from heartbeat_driver_process import heartbeat_driver_log_path_for_agent
 from restart_scheduling import (
     INITIAL_RESTART_DELAY_SECONDS,
     is_within_active_hours,
     seconds_until_active_hours_start,
 )
-from session_watchdog import heartbeat_driver_log_path_for_agent
 
 
 def build_tmux_target(tmux_session: str | None, agent_name: str) -> str | None:
@@ -55,6 +56,9 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
             continue
 
         launch_command = config["launch_command"]
+        harness_runtime_profile = HarnessRuntimeProfile(
+            config["harness_runtime_profile"]
+        )
         heartbeat_driver_argv = config.get("heartbeat_driver_argv")
         active_hours_start = config.get("active_hours_start")
         active_hours_end = config.get("active_hours_end")
@@ -111,6 +115,7 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
                 tmux_target,
                 runtime_root_directory,
                 daily_session_rotation,
+                harness_runtime_profile,
             )
             return
 
@@ -127,6 +132,7 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
             active_weekdays_only,
             heartbeat_driver_log_path,
             restart_delay_seconds,
+            harness_runtime_profile,
         )
 
 

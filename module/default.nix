@@ -3,9 +3,11 @@
   imports = [
     ./options/interfaces.nix
     ./options/agent-type-interfaces.nix
+    ./options/harness-interfaces.nix
     ./options/host-wiring-interfaces.nix
     ./options/options.nix
     ./config/agent-assertions.nix
+    ./harnesses
     ./agent-types
     ./config/host-identity.nix
     ./config/fleet.nix

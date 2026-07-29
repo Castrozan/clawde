@@ -2,6 +2,7 @@ import argparse
 import sys
 import time
 
+from harness_runtime_profile import load_harness_runtime_profile_from_launch_config
 from multiplexer_pane_capture import capture_pane_content
 from stuck_indicators import pane_poll_is_stuck_evidence
 
@@ -11,11 +12,15 @@ UNRESPONSIVE_EXIT_CODE = 1
 
 
 def determine_pane_health_exit_code(
-    first_pane_content: str | None, second_pane_content: str | None
+    harness_runtime_profile,
+    first_pane_content: str | None,
+    second_pane_content: str | None,
 ) -> int:
     if second_pane_content is None:
         return HEALTHY_EXIT_CODE
-    if pane_poll_is_stuck_evidence(second_pane_content, first_pane_content):
+    if pane_poll_is_stuck_evidence(
+        harness_runtime_profile, second_pane_content, first_pane_content
+    ):
         return UNRESPONSIVE_EXIT_CODE
     return HEALTHY_EXIT_CODE
 
@@ -34,15 +39,28 @@ def parse_arguments() -> argparse.Namespace:
         required=True,
         help="tmux target in session:window form for the agent pane to inspect",
     )
+    parser.add_argument(
+        "--launch-config",
+        required=True,
+        help="Path to the agent's JSON launch config, read for the harness runtime "
+        "profile that says what an idle prompt and a quota modal look like",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     arguments = parse_arguments()
+    harness_runtime_profile = load_harness_runtime_profile_from_launch_config(
+        arguments.launch_config
+    )
     first_pane_content = capture_pane_content(arguments.tmux_target)
     time.sleep(SECONDS_BETWEEN_CAPTURES)
     second_pane_content = capture_pane_content(arguments.tmux_target)
-    sys.exit(determine_pane_health_exit_code(first_pane_content, second_pane_content))
+    sys.exit(
+        determine_pane_health_exit_code(
+            harness_runtime_profile, first_pane_content, second_pane_content
+        )
+    )
 
 
 if __name__ == "__main__":

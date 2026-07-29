@@ -7,6 +7,10 @@ sys.path.insert(
 
 import launch_session
 import session_persistence
+from harness_profile_test_helpers import make_claude_profile, make_codex_profile
+
+CLAUDE_PROFILE = make_claude_profile()
+CODEX_PROFILE = make_codex_profile()
 
 
 def _write_conversation(home, workspace, session_identifier):
@@ -18,19 +22,50 @@ def _write_conversation(home, workspace, session_identifier):
 def test_a_session_with_no_conversation_file_is_not_resumable(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
 
-    assert session_persistence.session_conversation_exists("abc", "/w/jenny") is False
+    assert (
+        session_persistence.session_conversation_exists(
+            CLAUDE_PROFILE, "abc", "/w/jenny"
+        )
+        is False
+    )
 
 
 def test_a_session_with_a_conversation_file_is_resumable(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     _write_conversation(tmp_path, "/w/jenny", "abc")
 
-    assert session_persistence.session_conversation_exists("abc", "/w/jenny") is True
+    assert (
+        session_persistence.session_conversation_exists(
+            CLAUDE_PROFILE, "abc", "/w/jenny"
+        )
+        is True
+    )
 
 
 def test_an_absent_identifier_is_never_resumable():
-    assert session_persistence.session_conversation_exists(None, "/w/jenny") is False
-    assert session_persistence.session_conversation_exists("", "/w/jenny") is False
+    assert (
+        session_persistence.session_conversation_exists(
+            CLAUDE_PROFILE, None, "/w/jenny"
+        )
+        is False
+    )
+    assert (
+        session_persistence.session_conversation_exists(CLAUDE_PROFILE, "", "/w/jenny")
+        is False
+    )
+
+
+def test_a_harness_owning_its_own_sessions_trusts_a_recorded_identifier(tmp_path):
+    assert (
+        session_persistence.session_conversation_exists(
+            CODEX_PROFILE, "harness-owned-session", str(tmp_path)
+        )
+        is True
+    ), (
+        "codex keeps its sessions where clawde cannot probe them, so a recorded "
+        "session must be trusted as resumable rather than probed against a claude "
+        "transcript path that will never exist"
+    )
 
 
 def test_launch_starts_fresh_when_the_pinned_conversation_never_persisted(
@@ -38,7 +73,9 @@ def test_launch_starts_fresh_when_the_pinned_conversation_never_persisted(
 ):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setattr(
-        launch_session, "session_conversation_exists", lambda _identifier: False
+        launch_session,
+        "session_conversation_exists",
+        lambda _profile, _identifier: False,
     )
     runtime_root = tmp_path / "clawde"
     (runtime_root / "session-ids").mkdir(parents=True)
@@ -47,18 +84,20 @@ def test_launch_starts_fresh_when_the_pinned_conversation_never_persisted(
     )
 
     decision = launch_session.decide_and_persist_launch_session(
-        str(runtime_root), "jenny", False
+        str(runtime_root), "jenny", False, CLAUDE_PROFILE
     )
 
     assert decision.resume_previous_session is False
-    assert decision.resume_flag.startswith("--session-id ")
-    assert "phantom" not in decision.resume_flag
+    assert decision.session_argv.startswith("--session-id ")
+    assert "phantom" not in decision.session_argv
 
 
 def test_launch_resumes_when_the_pinned_conversation_exists(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setattr(
-        launch_session, "session_conversation_exists", lambda _identifier: True
+        launch_session,
+        "session_conversation_exists",
+        lambda _profile, _identifier: True,
     )
     runtime_root = tmp_path / "clawde"
     (runtime_root / "session-ids").mkdir(parents=True)
@@ -67,8 +106,8 @@ def test_launch_resumes_when_the_pinned_conversation_exists(tmp_path, monkeypatc
     )
 
     decision = launch_session.decide_and_persist_launch_session(
-        str(runtime_root), "jenny", False
+        str(runtime_root), "jenny", False, CLAUDE_PROFILE
     )
 
     assert decision.resume_previous_session is True
-    assert decision.resume_flag == "--resume real"
+    assert decision.session_argv == "--resume real"

@@ -21,8 +21,15 @@ let
     else
       "clawde agent ${name}";
 
+  resolveA2APeerMeaningfulLinePattern =
+    agent: harnessMeaningfulOutputLinePattern:
+    if agent.expose.a2a.meaningfulLinePattern != null then
+      agent.expose.a2a.meaningfulLinePattern
+    else
+      harnessMeaningfulOutputLinePattern;
+
   buildA2APeerWindowCommand =
-    name: agent:
+    name: agent: harnessMeaningfulOutputLinePattern:
     pkgs.writeShellScript "clawde-a2a-peer-${name}" (
       lib.concatStringsSep " " [
         "exec"
@@ -44,7 +51,7 @@ let
         "--backend-type"
         "tmux"
         "--tmux-meaningful-line-pattern"
-        (lib.escapeShellArg agent.expose.a2a.tmuxMeaningfulLinePattern)
+        (lib.escapeShellArg (resolveA2APeerMeaningfulLinePattern agent harnessMeaningfulOutputLinePattern))
         "--tmux-session-name"
         (lib.escapeShellArg agent.tmuxSession)
         "--tmux-window-name"
@@ -52,9 +59,9 @@ let
       ]
     );
 
-  buildA2APeerWindowSpecification = name: agent: {
+  buildA2APeerWindowSpecification = name: agent: harnessMeaningfulOutputLinePattern: {
     name = "${name}-a2a";
-    wrapper_command = "${buildA2APeerWindowCommand name agent}";
+    wrapper_command = "${buildA2APeerWindowCommand name agent harnessMeaningfulOutputLinePattern}";
   };
 in
 {
@@ -62,5 +69,8 @@ in
     agent: if agent.expose.a2a.enable then a2aPeerAdapterInstructions else "";
 
   peerWindowSpecificationsForAgent =
-    name: agent: lib.optional agent.expose.a2a.enable (buildA2APeerWindowSpecification name agent);
+    name: agent: harnessMeaningfulOutputLinePattern:
+    lib.optional agent.expose.a2a.enable (
+      buildA2APeerWindowSpecification name agent harnessMeaningfulOutputLinePattern
+    );
 }

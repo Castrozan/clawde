@@ -9,6 +9,7 @@ sys.path.insert(
 )
 
 import on_demand_decision
+from harness_profile_test_helpers import CLAUDE_PROFILE_MAPPING
 import on_demand_lease
 
 AGENT_NAME = "on-demand-agent"
@@ -18,7 +19,7 @@ def deploy_agent(home_directory, launch_config, session_identifier=None):
     launch_config_directory = home_directory / "clawde" / "launch-config"
     launch_config_directory.mkdir(parents=True, exist_ok=True)
     (launch_config_directory / f"{AGENT_NAME}.json").write_text(
-        json.dumps(launch_config)
+        json.dumps({"harness_runtime_profile": CLAUDE_PROFILE_MAPPING, **launch_config})
     )
     if session_identifier is None:
         return

@@ -24,10 +24,15 @@
             default = _: null;
             description = "Function: agent -> absolute workspace path, or null to fall back to the clawde default (~/clawde/<name>).";
           };
+          workspaceSettingsFor = lib.mkOption {
+            type = lib.types.functionTo (lib.types.attrsOf lib.types.anything);
+            default = _: { };
+            description = "Function: { name, agent } -> harness-native settings this adapter needs, merged by the harness into the agent's own per-agent settings file (hooks that enforce a reply, plugin enablement, and the like). Expressed in the vocabulary of the harnesses this adapter declares support for.";
+          };
           agentActivationScriptFor = lib.mkOption {
             type = lib.types.functionTo lib.types.str;
             default = _: "";
-            description = "Function: { name, agent, workspaceDirectory, claudeBinary } -> shell snippet appended to home.activation. Used for adapter-specific workspace seeding (HEARTBEAT.md path, .claude.json placement, etc).";
+            description = "Function: { name, agent, workspaceDirectory, harnessBinary } -> shell snippet appended to home.activation. Used for adapter-specific workspace seeding (secret injection, channel access files, and the like).";
           };
           preActivation = lib.mkOption {
             type = lib.types.nullOr lib.types.str;

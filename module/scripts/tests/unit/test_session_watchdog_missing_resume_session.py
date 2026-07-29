@@ -2,6 +2,8 @@ import importlib.util
 import pathlib
 import sys
 
+from harness_profile_test_helpers import make_claude_profile
+
 AGENT_WRAPPER_DIRECTORY = (
     pathlib.Path(__file__).resolve().parent.parent.parent / "agent-wrapper"
 )
@@ -20,6 +22,8 @@ def _load_agent_wrapper_module(module_name: str):
 
 session_watchdog = _load_agent_wrapper_module("session_watchdog")
 
+CLAUDE_PROFILE = make_claude_profile()
+
 
 def test_stale_missing_session_line_in_scrollback_does_not_trigger_drop(monkeypatch):
     resumed_then_idle_pane_with_stale_crash_scrollback = (
@@ -37,6 +41,7 @@ def test_stale_missing_session_line_in_scrollback_does_not_trigger_drop(monkeypa
 
     assert (
         session_watchdog.resume_launch_hit_missing_session(
+            CLAUDE_PROFILE,
             is_resume_launch=True,
             was_stuck_kill=False,
             tmux_target="clawde:ai-first-initiative",
@@ -58,6 +63,7 @@ def test_missing_session_line_in_pane_tail_still_triggers_drop(monkeypatch):
 
     assert (
         session_watchdog.resume_launch_hit_missing_session(
+            CLAUDE_PROFILE,
             is_resume_launch=True,
             was_stuck_kill=False,
             tmux_target="clawde:ai-first-initiative",
