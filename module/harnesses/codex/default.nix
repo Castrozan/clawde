@@ -16,6 +16,10 @@ let
     name: "${runtimeLocations.runtimeRootRelativeToHome}/harness-home/codex/${name}";
   codexHomeDirectory = name: "${homeDir}/${codexHomeRelativeToHome name}";
 
+  unshadowedBinaryDirectoryRelativeToHome = "${runtimeLocations.runtimeRootRelativeToHome}/harness-home/codex/bin";
+  unshadowedBinaryDirectory = "${homeDir}/${unshadowedBinaryDirectoryRelativeToHome}";
+  unshadowedBinaryPathAssignment = "PATH=${lib.escapeShellArg unshadowedBinaryDirectory}:\"$PATH\"";
+
   userCodexAuthenticationFile = "${homeDir}/.codex/auth.json";
 
   seedCodexHarnessHomeScript = pkgs.writeShellScript "seed-one-codex-harness-home" (
@@ -126,7 +130,7 @@ in
           codexHomeAssignment = "CODEX_HOME=${lib.escapeShellArg (codexHomeDirectory name)}";
           developerInstructionsFlag = "-c developer_instructions=\"$(cat ${instructionsFile})\"";
         in
-        "${codexHomeAssignment} ${binaryName} ${sessionArgvShellExpansion} --no-alt-screen --dangerously-bypass-hook-trust ${developerInstructionsFlag}";
+        "${unshadowedBinaryPathAssignment} ${codexHomeAssignment} ${binaryName} ${sessionArgvShellExpansion} --no-alt-screen --dangerously-bypass-hook-trust ${developerInstructionsFlag}";
 
       buildRunOnceCommandFor =
         {
@@ -140,7 +144,7 @@ in
           codexHomeAssignment = "CODEX_HOME=${lib.escapeShellArg (codexHomeDirectory name)}";
           developerInstructionsFlag = "-c developer_instructions=\"$(cat ${instructionsFile})\"";
         in
-        "${codexHomeAssignment} ${binaryName} exec --dangerously-bypass-approvals-and-sandbox ${developerInstructionsFlag} ${lib.escapeShellArg agent.heartbeatPrompt}";
+        "${unshadowedBinaryPathAssignment} ${codexHomeAssignment} ${binaryName} exec --dangerously-bypass-approvals-and-sandbox ${developerInstructionsFlag} ${lib.escapeShellArg agent.heartbeatPrompt}";
 
       workspaceFilesFor =
         {
@@ -164,6 +168,11 @@ in
           (lib.escapeShellArg userCodexAuthenticationFile)
           (lib.escapeShellArg (lib.concatStringsSep "\n" agent.skillDirectories))
         ];
+    };
+
+    home.file = lib.optionalAttrs (hasCodexAgents && cfg.harnesses.codex.package != null) {
+      "${unshadowedBinaryDirectoryRelativeToHome}/${cfg.harnesses.codex.binaryName}".source =
+        "${cfg.harnesses.codex.package}/bin/${cfg.harnesses.codex.binaryName}";
     };
 
     assertions = lib.optionals hasCodexAgents [
