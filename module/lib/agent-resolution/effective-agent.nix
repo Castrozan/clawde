@@ -21,7 +21,7 @@ in
     agent
     // {
       model = firstNonNull agent.model (
-        firstNonNull (typeDefault (t: t.defaultModel)) harnessDefaultModel
+        firstNonNull (typeDefault (t: t.defaultModelByHarness.${agent.harness} or null)) harnessDefaultModel
       );
       permissionMode = firstNonNull agent.permissionMode (
         firstNonNull (typeDefault (t: t.defaultPermissionMode)) "default"

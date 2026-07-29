@@ -14,10 +14,10 @@
             default = _: null;
             description = "Function: agent -> personality text with typeParams substituted, or null to leave personality to the instance.";
           };
-          defaultModel = lib.mkOption {
-            type = lib.types.nullOr lib.types.str;
-            default = null;
-            description = "Model alias inherited by agents of this type unless the instance overrides it. Null inherits nothing.";
+          defaultModelByHarness = lib.mkOption {
+            type = lib.types.attrsOf lib.types.str;
+            default = { };
+            description = "Model identifier inherited by agents of this type, keyed by the harness they run on, since a model name is only meaningful inside one harness's vocabulary. A type that wants a stronger model than the harness default names one per harness it supports; a harness with no entry falls through to that harness's own defaultModel rather than borrowing another harness's alias.";
           };
           defaultPermissionMode = lib.mkOption {
             type = lib.types.nullOr lib.types.str;

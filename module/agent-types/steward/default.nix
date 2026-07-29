@@ -25,7 +25,7 @@ in
   config = lib.mkMerge [
     {
       clawde.agentTypes.steward = {
-        defaultModel = "opus";
+        defaultModelByHarness.claude = "opus";
         defaultPermissionMode = "bypassPermissions";
         defaultDailySessionRotation = true;
         defaultLaunchOnTrigger = true;
