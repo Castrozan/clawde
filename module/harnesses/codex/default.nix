@@ -54,7 +54,7 @@ let
       fast_default_opt_out = true;
     };
 
-    mcp_servers = agent.mcpServers;
+    mcp_servers = if agent.mcpServers == null then { } else agent.mcpServers;
   };
 in
 {
