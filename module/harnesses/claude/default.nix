@@ -20,7 +20,7 @@ in
 
       meaningfulOutputLinePattern = "^⏺ ";
 
-      enforcesDenyToolPatterns = true;
+      unenforceableDenyToolPatternsFor = _: [ ];
 
       supportedChannelTypes = [
         "none"

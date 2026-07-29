@@ -21,6 +21,15 @@ in
             effectiveAgent = helpers.effectiveAgentByName name;
             typeDefinition = helpers.cfg.agentTypes.${agent.type} or null;
             harnessDefinition = helpers.getHarnessFor agent;
+            unenforceableDenyToolPatterns =
+              if harnessDefinition == null then
+                [ ]
+              else
+                harnessDefinition.unenforceableDenyToolPatternsFor {
+                  inherit name;
+                  agent = effectiveAgent;
+                  inherit (effectiveAgent) denyToolPatterns;
+                };
             missingRequiredParams =
               if typeDefinition == null then
                 [ ]
@@ -67,11 +76,8 @@ in
               }. Move the agent to a harness that carries this channel, or drop the channel.";
             }
             {
-              assertion =
-                harnessDefinition == null
-                || effectiveAgent.denyToolPatterns == [ ]
-                || harnessDefinition.enforcesDenyToolPatterns;
-              message = "Agent ${name}: harness '${agent.harness}' cannot enforce denyToolPatterns, so its guardrails ${lib.concatStringsSep ", " effectiveAgent.denyToolPatterns} would be silently dropped and the agent would run unrestricted. Move it to a harness that enforces them, or drop the patterns deliberately.";
+              assertion = unenforceableDenyToolPatterns == [ ];
+              message = "Agent ${name}: harness '${agent.harness}' can neither refuse ${lib.concatStringsSep ", " unenforceableDenyToolPatterns} at call time nor make it unreachable by construction, so moving the agent here would silently drop those guardrails and let it run unrestricted. Keep it on a harness that enforces them, or drop the patterns deliberately.";
             }
           ];
       in

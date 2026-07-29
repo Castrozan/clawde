@@ -24,6 +24,8 @@ let
 
   codexConfigurationTomlFormat = pkgs.formats.toml { };
 
+  denyToolPatternReachability = import ./deny-tool-pattern-reachability.nix { inherit lib; };
+
   runStateStatusLineSegment = "run-state";
 
   buildCodexConfigurationFor =
@@ -84,6 +86,8 @@ in
       meaningfulOutputLinePattern = "^• ";
 
       supportedChannelTypes = [ "none" ];
+
+      inherit (denyToolPatternReachability) unenforceableDenyToolPatternsFor;
 
       runtimeProfile = {
         liveProcessNameFragment = "codex";

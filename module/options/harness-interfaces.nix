@@ -144,10 +144,10 @@ in
               default = null;
               description = "Optional activation snippet run once when at least one agent uses this harness.";
             };
-            enforcesDenyToolPatterns = lib.mkOption {
-              type = lib.types.bool;
-              default = false;
-              description = "Whether this harness can actually refuse the tool calls an agent's denyToolPatterns names. An agent carrying deny patterns on a harness that cannot enforce them fails a build-time assertion rather than launching with its guardrails silently dropped.";
+            unenforceableDenyToolPatternsFor = lib.mkOption {
+              type = lib.types.functionTo (lib.types.listOf lib.types.str);
+              default = { denyToolPatterns, ... }: denyToolPatterns;
+              description = "Function: { name, agent, denyToolPatterns } -> the subset of the agent's deny patterns this harness can neither refuse at call time nor make unreachable by construction, which fails a build-time assertion so moving an agent between harnesses never silently drops a guardrail. A harness with a call-time denylist returns nothing. An inclusion-based harness, which grants capability by wiring rather than by refusal, returns only the patterns naming something it wires in anyway. The default calls every pattern unenforceable, the safe answer for a harness that has declared nothing.";
             };
             supportedChannelTypes = lib.mkOption {
               type = lib.types.listOf lib.types.str;
