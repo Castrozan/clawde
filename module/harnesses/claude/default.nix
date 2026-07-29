@@ -12,6 +12,17 @@ let
   seedClaudeWorkspaceScript = pkgs.writeShellScript "seed-one-workspace-claude" (
     builtins.readFile ./scripts/seed-claude-workspace.sh
   );
+
+  agentScopedMcpConfigFlagsFor =
+    name: agent:
+    lib.optionalString (agent.mcpServers != { }) (
+      let
+        agentScopedMcpConfigFile = pkgs.writeText "clawde-agent-mcp-config-${name}.json" (
+          builtins.toJSON { inherit (agent) mcpServers; }
+        );
+      in
+      "--strict-mcp-config --mcp-config ${agentScopedMcpConfigFile} "
+    );
 in
 {
   config = {
@@ -93,9 +104,7 @@ in
             directory: "--add-dir ${directory}"
           ) agent.skillDirectories;
           appendSystemPromptFlag = "--append-system-prompt \"$(cat ${instructionsFile})\"";
-          mcpConfigFlags = lib.optionalString (
-            agent.mcpConfigFile != null
-          ) "--strict-mcp-config --mcp-config ${agent.mcpConfigFile} ";
+          mcpConfigFlags = agentScopedMcpConfigFlagsFor name agent;
         in
         "${binaryName} ${sessionArgvShellExpansion} ${channelLaunchFlags} ${modelFlag} ${nameFlag} ${permissionModeFlag} ${mcpConfigFlags}${appendSystemPromptFlag} ${skillDirectoryFlags}";
 
@@ -116,9 +125,7 @@ in
             directory: "--add-dir ${directory}"
           ) agent.skillDirectories;
           appendSystemPromptFlag = "--append-system-prompt \"$(cat ${instructionsFile})\"";
-          mcpConfigFlags = lib.optionalString (
-            agent.mcpConfigFile != null
-          ) "--strict-mcp-config --mcp-config ${agent.mcpConfigFile} ";
+          mcpConfigFlags = agentScopedMcpConfigFlagsFor name agent;
         in
         "${binaryName} ${runOncePrintFlag} \${CLAWDE_SESSION_ARGV:-} ${modelFlag} ${nameFlag} ${permissionModeFlag} ${mcpConfigFlags}${appendSystemPromptFlag} ${skillDirectoryFlags}";
 

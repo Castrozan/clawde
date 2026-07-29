@@ -24,47 +24,38 @@ let
 
   codexConfigurationTomlFormat = pkgs.formats.toml { };
 
-  denyToolPatternReachability = import ./deny-tool-pattern-reachability.nix { inherit lib; };
+  denyToolPatternReachability = import ./deny-tool-pattern-reachability.nix;
 
   runStateStatusLineSegment = "run-state";
 
-  buildCodexConfigurationFor =
-    agent: workspaceDirectory:
-    let
-      workspaceMcpServers =
-        if agent.mcpConfigFile == null then
-          { }
-        else
-          (builtins.fromJSON (builtins.readFile agent.mcpConfigFile)).mcpServers or { };
-    in
-    {
-      inherit (agent) model;
-      model_reasoning_effort = agent.reasoningEffort;
-      approval_policy = "never";
-      sandbox_mode = "danger-full-access";
-      suppress_unstable_features_warning = true;
+  buildCodexConfigurationFor = agent: workspaceDirectory: {
+    inherit (agent) model;
+    model_reasoning_effort = agent.reasoningEffort;
+    approval_policy = "never";
+    sandbox_mode = "danger-full-access";
+    suppress_unstable_features_warning = true;
 
-      projects.${workspaceDirectory}.trust_level = "trusted";
+    projects.${workspaceDirectory}.trust_level = "trusted";
 
-      tui = {
-        animations = false;
-        show_tooltips = false;
-        status_line = [
-          runStateStatusLineSegment
-          "model-with-reasoning"
-          "context-used"
-        ];
-      };
-
-      notice = {
-        hide_full_access_warning = true;
-        hide_rate_limit_model_nudge = true;
-        hide_world_writable_warning = true;
-        fast_default_opt_out = true;
-      };
-
-      mcp_servers = workspaceMcpServers;
+    tui = {
+      animations = false;
+      show_tooltips = false;
+      status_line = [
+        runStateStatusLineSegment
+        "model-with-reasoning"
+        "context-used"
+      ];
     };
+
+    notice = {
+      hide_full_access_warning = true;
+      hide_rate_limit_model_nudge = true;
+      hide_world_writable_warning = true;
+      fast_default_opt_out = true;
+    };
+
+    mcp_servers = agent.mcpServers;
+  };
 in
 {
   options.clawde.agents = lib.mkOption {

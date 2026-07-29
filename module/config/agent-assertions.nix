@@ -52,8 +52,8 @@ in
               message = "Agent ${name}: channel.type must be one of ${lib.concatStringsSep ", " knownChannelTypes} (got '${agent.channel.type}').";
             }
             {
-              assertion = !(agent.mcpConfigFile != null && agent.channel.type != "none");
-              message = "Agent ${name}: mcpConfigFile is incompatible with a channel adapter (channel.type = '${agent.channel.type}'). mcpConfigFile launches the agent with --strict-mcp-config, so Claude Code loads only the servers named in --mcp-config and excludes the channel plugin's own MCP server, which makes the channel (e.g. discord) silently fail to connect. Drop mcpConfigFile on channel agents and scope their tools with denyToolPatterns instead.";
+              assertion = !(agent.mcpServers != { } && agent.channel.type != "none");
+              message = "Agent ${name}: mcpServers is incompatible with a channel adapter (channel.type = '${agent.channel.type}'). An agent-scoped MCP set launches the harness in strict MCP mode, so it loads only the servers named there and excludes the channel plugin's own MCP server, which makes the channel (e.g. discord) silently fail to connect. Drop mcpServers on channel agents and scope their tools with denyToolPatterns instead.";
             }
             {
               assertion = builtins.elem agent.type knownAgentTypes;
