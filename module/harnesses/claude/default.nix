@@ -20,6 +20,8 @@ in
 
       meaningfulOutputLinePattern = "^⏺ ";
 
+      enforcesDenyToolPatterns = true;
+
       supportedChannelTypes = [
         "none"
         "discord"

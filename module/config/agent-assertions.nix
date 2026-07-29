@@ -66,6 +66,13 @@ in
                 lib.concatStringsSep ", " (harnessDefinition.supportedChannelTypes or [ ])
               }. Move the agent to a harness that carries this channel, or drop the channel.";
             }
+            {
+              assertion =
+                harnessDefinition == null
+                || effectiveAgent.denyToolPatterns == [ ]
+                || harnessDefinition.enforcesDenyToolPatterns;
+              message = "Agent ${name}: harness '${agent.harness}' cannot enforce denyToolPatterns, so its guardrails ${lib.concatStringsSep ", " effectiveAgent.denyToolPatterns} would be silently dropped and the agent would run unrestricted. Move it to a harness that enforces them, or drop the patterns deliberately.";
+            }
           ];
       in
       lib.concatMap assertionsForAgent helpers.agentNames;

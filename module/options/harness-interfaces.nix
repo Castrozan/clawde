@@ -144,6 +144,11 @@ in
               default = null;
               description = "Optional activation snippet run once when at least one agent uses this harness.";
             };
+            enforcesDenyToolPatterns = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = "Whether this harness can actually refuse the tool calls an agent's denyToolPatterns names. An agent carrying deny patterns on a harness that cannot enforce them fails a build-time assertion rather than launching with its guardrails silently dropped.";
+            };
             supportedChannelTypes = lib.mkOption {
               type = lib.types.listOf lib.types.str;
               default = [ "none" ];
