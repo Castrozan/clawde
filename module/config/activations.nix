@@ -16,6 +16,7 @@ let
     getAgentTypeFor
     getHarnessFor
     distinctHarnessNamesInUse
+    effectiveAgentByName
     ;
 
   perAgentActivationLines =
@@ -23,7 +24,7 @@ let
     lib.concatMapStringsSep "\n" (
       name:
       let
-        agent = cfg.agents.${name};
+        agent = effectiveAgentByName name;
         provider = resolveProvider agent;
       in
       if provider != null then
