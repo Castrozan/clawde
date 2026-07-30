@@ -30,8 +30,19 @@ _project_one_skill_set_into_harness_skills() {
 	done
 }
 
+_remove_previously_projected_skills() {
+	[ -d "${HARNESS_SKILLS_DIRECTORY}" ] || return 0
+	local existing_entry
+	for existing_entry in "${HARNESS_SKILLS_DIRECTORY}"/*; do
+		if [ -L "${existing_entry}" ]; then
+			rm -f "${existing_entry}"
+		fi
+	done
+}
+
 _project_all_skill_sets_into_harness_skills() {
 	mkdir -p "${HARNESS_SKILLS_DIRECTORY}"
+	_remove_previously_projected_skills
 	[ -n "${NEWLINE_SEPARATED_SKILL_DIRECTORIES}" ] || return 0
 	local skill_set_directory
 	while IFS= read -r skill_set_directory; do
