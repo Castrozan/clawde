@@ -14,4 +14,7 @@ rec {
 
   agentLaunchConfigRelativeToHome = name: "${runtimeRootRelativeToHome}/launch-config/${name}.json";
   agentLaunchConfigFile = name: "${homeDir}/${agentLaunchConfigRelativeToHome name}";
+
+  sidecarProcessLogRelativeToHome = name: "${runtimeRootRelativeToHome}/sidecar-logs/${name}.log";
+  sidecarProcessLogFile = name: "${homeDir}/${sidecarProcessLogRelativeToHome name}";
 }

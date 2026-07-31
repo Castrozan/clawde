@@ -16,6 +16,7 @@
   getChannelAdapterFor,
   getHarnessFor,
   serializeHarnessRuntimeProfile,
+  sidecarProcessLogFile,
 }:
 let
   sessionArgvShellExpansion = "\${CLAWDE_SESSION_ARGV:-}";
@@ -139,12 +140,7 @@ let
       ${execPythonWrapperInvocation}
     '';
 
-  buildAgentSpecification = name: agent: {
-    inherit name;
-    wrapper_command = "exec ${buildAgentWindowCommand name agent}";
-  };
-
-  channelSidecarSpecificationsForAgent =
+  channelSidecarProcessesForAgent =
     name: agent:
     let
       adapter = getChannelAdapterFor agent;
@@ -154,17 +150,25 @@ let
     if adapter == null then
       [ ]
     else
-      adapter.sidecarWindowSpecificationsFor {
-        inherit name agent workspaceDirectory;
-        oneShotTurnCommand =
-          if buildOneShotTurnCommandFor == null then
-            null
-          else
-            buildOneShotTurnCommandFor {
-              inherit name agent workspaceDirectory;
-              instructionsFile = agentInstructionsFile name;
-            };
-      };
+      map (sidecar: sidecar // { log_file = sidecarProcessLogFile sidecar.name; }) (
+        adapter.sidecarProcessSpecificationsFor {
+          inherit name agent workspaceDirectory;
+          oneShotTurnCommand =
+            if buildOneShotTurnCommandFor == null then
+              null
+            else
+              buildOneShotTurnCommandFor {
+                inherit name agent workspaceDirectory;
+                instructionsFile = agentInstructionsFile name;
+              };
+        }
+      );
+
+  buildAgentSpecification = name: agent: {
+    inherit name;
+    wrapper_command = "exec ${buildAgentWindowCommand name agent}";
+    sidecar_processes = channelSidecarProcessesForAgent name agent;
+  };
 
   buildAllSpecificationsForOneAgent =
     name:
@@ -173,9 +177,8 @@ let
       outputLinePattern = (getHarnessFor agent).meaningfulOutputLinePattern;
       mainSpec = buildAgentSpecification name agent;
       peerSpecs = a2aPeerHelpers.peerWindowSpecificationsForAgent name agent outputLinePattern;
-      sidecarSpecs = channelSidecarSpecificationsForAgent name agent;
     in
-    [ mainSpec ] ++ peerSpecs ++ sidecarSpecs;
+    [ mainSpec ] ++ peerSpecs;
 in
 {
   inherit

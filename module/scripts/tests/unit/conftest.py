@@ -28,6 +28,7 @@ def agent_runtime_state_is_isolated_from_this_machines_live_agents(
     isolated_home_directory = tmp_path / "isolated-home"
     isolated_home_directory.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("HOME", str(isolated_home_directory))
+    monkeypatch.delenv("CLAWDE_MULTIPLEXER", raising=False)
 
 
 @pytest.fixture(autouse=True)

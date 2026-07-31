@@ -79,7 +79,7 @@ let
       getHarnessFor
       ;
     inherit (harnessRuntimeProfileHelpers) serializeHarnessRuntimeProfile;
-    inherit (runtimeLocations) agentInstructionsFile agentLaunchConfigFile;
+    inherit (runtimeLocations) agentInstructionsFile agentLaunchConfigFile sidecarProcessLogFile;
   };
   inherit (agentWindowSpecHelpers)
     buildAllSpecificationsForOneAgent

@@ -41,6 +41,9 @@ let
     pythonPackages.discordpy
   ]);
 
+  discordBridgeProcessMatchPatternFor =
+    name: "${./scripts/bridge.py} --agent-name ${lib.escapeShellArg name} --one-shot-turn-command";
+
   discordBridgeCommandFor =
     {
       name,
@@ -54,13 +57,12 @@ let
       waitForTokenPrefix = lib.optionalString hasToken "${waitForSecretScript} ${tokenFile} && ";
       tokenAssignment = lib.optionalString hasToken "DISCORD_BOT_TOKEN=$(cat ${tokenFile}) ";
       bridgeArguments = lib.concatStringsSep " " [
-        "--agent-name ${lib.escapeShellArg name}"
-        "--one-shot-turn-command ${lib.escapeShellArg oneShotTurnCommand}"
+        "${discordBridgeProcessMatchPatternFor name} ${lib.escapeShellArg oneShotTurnCommand}"
         "--workspace-directory ${lib.escapeShellArg workspaceDirectory}"
         "--state-directory ${lib.escapeShellArg (discordChannelEnvDirectoryFor name)}"
       ];
     in
-    "${waitForTokenPrefix}${tokenAssignment}PYTHONPATH=${./scripts} exec ${bridgePythonEnvironment}/bin/python3 ${./scripts/bridge.py} ${bridgeArguments}";
+    "${waitForTokenPrefix}${tokenAssignment}PYTHONPATH=${./scripts} exec ${bridgePythonEnvironment}/bin/python3 ${bridgeArguments}";
 in
 {
   options.clawde.agents = lib.mkOption {
@@ -114,7 +116,7 @@ in
         enabledPlugins."discord@claude-plugins-official" = true;
       };
 
-      sidecarWindowSpecificationsFor =
+      sidecarProcessSpecificationsFor =
         {
           name,
           agent,
@@ -124,7 +126,7 @@ in
         lib.optionals (oneShotTurnCommand != null) [
           {
             name = "${name}-discord";
-            wrapper_command = discordBridgeCommandFor {
+            command = discordBridgeCommandFor {
               inherit
                 name
                 agent
@@ -132,6 +134,7 @@ in
                 oneShotTurnCommand
                 ;
             };
+            process_match_pattern = discordBridgeProcessMatchPatternFor name;
           }
         ];
 
