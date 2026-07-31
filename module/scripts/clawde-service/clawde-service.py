@@ -6,6 +6,7 @@ import active_hours_decision
 import agent_wrapper_reconcile
 import launch_gate_decision
 import on_demand_decision
+import sidecar_process_reconcile
 from supervisor_backend_base import (
     SupervisorMultiplexerBackend,
     select_supervisor_backend,
@@ -56,6 +57,10 @@ def ensure_agent_windows_for_session(
         agent_wrapper_reconcile.agent_names_with_running_wrapper_after_reconcile(
             session_name, agent_names_that_should_be_running
         )
+    )
+
+    sidecar_process_reconcile.reconcile_sidecar_processes_for_session(
+        session_specification, agent_names_that_should_be_running
     )
 
     for agent_specification in session_specification["agents"]:

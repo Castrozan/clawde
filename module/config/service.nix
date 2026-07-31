@@ -121,7 +121,7 @@ in
     type = lib.types.attrs;
     readOnly = true;
     default = clawdeServiceSpecification;
-    description = "Every supervised window the clawde service owns, agents and their sidecars alike, as the data the supervisor is handed. Exposed so a configuration can assert over what will actually be brought up rather than over the options it set, without forcing the specification file to build.";
+    description = "Everything the clawde service owns, each agent's window and the headless sidecar processes hanging off it, as the data the supervisor is handed. Exposed so a configuration can assert over what will actually be brought up rather than over the options it set, without forcing the specification file to build.";
   };
 
   config = lib.mkIf hasAgents {

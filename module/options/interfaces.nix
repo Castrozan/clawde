@@ -34,10 +34,10 @@
             default = _: "";
             description = "Function: { name, agent, workspaceDirectory, harnessBinary } -> shell snippet appended to home.activation. Used for adapter-specific workspace seeding (secret injection, channel access files, and the like).";
           };
-          sidecarWindowSpecificationsFor = lib.mkOption {
+          sidecarProcessSpecificationsFor = lib.mkOption {
             type = lib.types.functionTo (lib.types.listOf (lib.types.attrsOf lib.types.anything));
             default = _: [ ];
-            description = "Function: { name, agent, workspaceDirectory, oneShotTurnCommand } -> extra supervised windows this adapter needs beside the agent's own. Used when the harness carries no inbound transport of its own and the channel has to be bridged by a separate process. oneShotTurnCommand is null when the harness has no headless mode, which is the adapter's signal to emit nothing.";
+            description = "Function: { name, agent, workspaceDirectory, oneShotTurnCommand } -> headless processes this adapter needs running beside the agent, each { name, command, process_match_pattern }. Used when the harness carries no inbound transport of its own and the channel has to be bridged by a separate process. The supervisor owns these directly rather than giving them a multiplexer window, so the agent's own window stays the single entrypoint a human opens, and their output goes to a log file instead of a pane. process_match_pattern must identify exactly this agent's process in a `pgrep -f` over the whole machine, so it has to carry a delimiter after the agent name or it matches every agent whose name starts with this one. oneShotTurnCommand is null when the harness has no headless mode, which is the adapter's signal to emit nothing.";
           };
           preActivation = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
