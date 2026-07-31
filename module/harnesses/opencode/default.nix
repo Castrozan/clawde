@@ -29,28 +29,10 @@ let
 
   defaultAgentDefinitionName = "build";
 
-  buildPermissionMapFor = agent: {
-    bash = denyToolPatternTranslation.bashPermissionRuleFor agent.denyToolPatterns;
-    skill = denyToolPatternTranslation.skillPermissionRuleFor agent.denyToolPatterns;
-    edit = "allow";
-    read = "allow";
-    glob = "allow";
-    grep = "allow";
-    list = "allow";
-    task = "allow";
-    lsp = "allow";
-    external_directory = "allow";
-    todowrite = "allow";
-    webfetch = "allow";
-    websearch = "allow";
-    doom_loop = "allow";
-    question = "allow";
-  };
-
   buildOpencodeConfigurationFor =
     name: agent:
     let
-      permissionMap = buildPermissionMapFor agent;
+      permissionMap = denyToolPatternTranslation.permissionMapFor agent;
     in
     {
       "$schema" = "https://opencode.ai/config.json";

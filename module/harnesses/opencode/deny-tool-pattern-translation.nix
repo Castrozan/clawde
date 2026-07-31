@@ -5,6 +5,38 @@ let
 
   skillInvocationCaptured = pattern: builtins.match "Skill\\((.*)\\)" pattern;
 
+  opencodePermissionKeyByClaudeToolName = {
+    Edit = "edit";
+    Write = "edit";
+    NotebookEdit = "edit";
+    Read = "read";
+    Glob = "glob";
+    Grep = "grep";
+    Task = "task";
+    TodoWrite = "todowrite";
+    WebFetch = "webfetch";
+    WebSearch = "websearch";
+  };
+
+  permissionKeyDeniedByBareToolName =
+    pattern: opencodePermissionKeyByClaudeToolName.${pattern} or null;
+
+  alwaysAllowedPermissionKeys = [
+    "read"
+    "edit"
+    "glob"
+    "grep"
+    "list"
+    "task"
+    "lsp"
+    "external_directory"
+    "todowrite"
+    "webfetch"
+    "websearch"
+    "doom_loop"
+    "question"
+  ];
+
   registeredMcpServerNames =
     agent: if agent.mcpServers == null then [ ] else builtins.attrNames agent.mcpServers;
 
@@ -22,58 +54,50 @@ let
     in
     if colonSeparated != null then "${builtins.head colonSeparated} *" else claudePattern;
 
+  capturedValues =
+    capture: denyToolPatterns:
+    map builtins.head (builtins.filter (captures: captures != null) (map capture denyToolPatterns));
+
   deniedBashCommandPatterns =
     denyToolPatterns:
-    let
-      captured = builtins.filter (capture: capture != null) (map bashCommandCaptured denyToolPatterns);
-    in
-    map (capture: claudeBashPatternAsOpencodeCommandPattern (builtins.head capture)) captured;
+    map claudeBashPatternAsOpencodeCommandPattern (capturedValues bashCommandCaptured denyToolPatterns);
 
-  deniedSkillNames =
+  deniedPermissionKeys =
     denyToolPatterns:
-    let
-      captured = builtins.filter (capture: capture != null) (
-        map skillInvocationCaptured denyToolPatterns
-      );
-    in
-    map builtins.head captured;
-in
-{
-  bashPermissionRuleFor =
-    denyToolPatterns:
-    let
-      deniedCommandPatterns = deniedBashCommandPatterns denyToolPatterns;
-    in
-    if deniedCommandPatterns == [ ] then
-      "allow"
-    else
-      builtins.listToAttrs (
-        map (commandPattern: {
-          name = commandPattern;
-          value = "deny";
-        }) deniedCommandPatterns
-      )
-      // {
-        "*" = "allow";
-      };
+    builtins.filter (key: key != null) (map permissionKeyDeniedByBareToolName denyToolPatterns);
 
-  skillPermissionRuleFor =
-    denyToolPatterns:
-    let
-      deniedNames = deniedSkillNames denyToolPatterns;
-    in
+  denyEverythingNamedRule =
+    deniedNames:
     if deniedNames == [ ] then
       "allow"
     else
       builtins.listToAttrs (
-        map (skillName: {
-          name = skillName;
+        map (deniedName: {
+          name = deniedName;
           value = "deny";
         }) deniedNames
       )
       // {
         "*" = "allow";
       };
+in
+{
+  permissionMapFor =
+    agent:
+    let
+      deniedKeys = deniedPermissionKeys agent.denyToolPatterns;
+      actionForKey = key: if builtins.elem key deniedKeys then "deny" else "allow";
+    in
+    builtins.listToAttrs (
+      map (key: {
+        name = key;
+        value = actionForKey key;
+      }) alwaysAllowedPermissionKeys
+    )
+    // {
+      bash = denyEverythingNamedRule (deniedBashCommandPatterns agent.denyToolPatterns);
+      skill = denyEverythingNamedRule (capturedValues skillInvocationCaptured agent.denyToolPatterns);
+    };
 
   unenforceableDenyToolPatternsFor =
     { agent, denyToolPatterns, ... }:
@@ -82,6 +106,7 @@ in
       !(
         bashCommandCaptured pattern != null
         || skillInvocationCaptured pattern != null
+        || permissionKeyDeniedByBareToolName pattern != null
         || namesAnUnregisteredMcpServer agent pattern
       )
     ) denyToolPatterns;
