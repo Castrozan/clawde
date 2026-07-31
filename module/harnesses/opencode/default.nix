@@ -1,10 +1,12 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 let
   cfg = config.clawde;
+  extractReplyFromRunOutput = "${pkgs.python312}/bin/python3 ${./scripts/extract-reply-from-run-output.py}";
   homeDir = config.home.homeDirectory;
   runtimeLocations = import ../../lib/runtime-locations.nix { inherit homeDir; };
 
@@ -77,7 +79,10 @@ in
 
       meaningfulOutputLinePattern = "^\\s*▣\\s+";
 
-      supportedChannelTypes = [ "none" ];
+      supportedChannelTypes = [
+        "none"
+        "discord"
+      ];
 
       inherit (denyToolPatternTranslation) unenforceableDenyToolPatternsFor;
 
@@ -129,6 +134,15 @@ in
           configurationAssignment = "OPENCODE_CONFIG=${lib.escapeShellArg (agentConfigurationFile name)}";
         in
         "${unshadowedBinaryPathAssignment} ${configurationAssignment} ${binaryName} run ${lib.escapeShellArg agent.heartbeatPrompt}";
+
+      buildOneShotTurnCommandFor =
+        { name, ... }:
+        let
+          inherit (cfg.harnesses.opencode) binaryName;
+          configurationAssignment = "OPENCODE_CONFIG=${lib.escapeShellArg (agentConfigurationFile name)}";
+          continueFlag = "\${CLAWDE_CHANNEL_SESSION_CONTINUATION:+--continue}";
+        in
+        "${unshadowedBinaryPathAssignment} ${configurationAssignment} ${binaryName} run ${continueFlag} \"$CLAWDE_CHANNEL_PROMPT\" | ${extractReplyFromRunOutput} > \"$CLAWDE_CHANNEL_REPLY_FILE\"";
 
       workspaceFilesFor =
         { name, agent, ... }:

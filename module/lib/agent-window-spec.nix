@@ -13,6 +13,7 @@
   resolveChannelAdapterInstructions,
   resolveChannelAdapterLaunchFlag,
   resolveChannelAdapterEnvironmentSetter,
+  getChannelAdapterFor,
   getHarnessFor,
   serializeHarnessRuntimeProfile,
 }:
@@ -143,6 +144,28 @@ let
     wrapper_command = "exec ${buildAgentWindowCommand name agent}";
   };
 
+  channelSidecarSpecificationsForAgent =
+    name: agent:
+    let
+      adapter = getChannelAdapterFor agent;
+      inherit (getHarnessFor agent) buildOneShotTurnCommandFor;
+      workspaceDirectory = agentWorkspaceDirectory name;
+    in
+    if adapter == null then
+      [ ]
+    else
+      adapter.sidecarWindowSpecificationsFor {
+        inherit name agent workspaceDirectory;
+        oneShotTurnCommand =
+          if buildOneShotTurnCommandFor == null then
+            null
+          else
+            buildOneShotTurnCommandFor {
+              inherit name agent workspaceDirectory;
+              instructionsFile = agentInstructionsFile name;
+            };
+      };
+
   buildAllSpecificationsForOneAgent =
     name:
     let
@@ -150,8 +173,9 @@ let
       outputLinePattern = (getHarnessFor agent).meaningfulOutputLinePattern;
       mainSpec = buildAgentSpecification name agent;
       peerSpecs = a2aPeerHelpers.peerWindowSpecificationsForAgent name agent outputLinePattern;
+      sidecarSpecs = channelSidecarSpecificationsForAgent name agent;
     in
-    [ mainSpec ] ++ peerSpecs;
+    [ mainSpec ] ++ peerSpecs ++ sidecarSpecs;
 in
 {
   inherit

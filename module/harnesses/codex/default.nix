@@ -68,7 +68,10 @@ in
 
       meaningfulOutputLinePattern = "^• ";
 
-      supportedChannelTypes = [ "none" ];
+      supportedChannelTypes = [
+        "none"
+        "discord"
+      ];
 
       inherit (denyToolPatternReachability) unenforceableDenyToolPatternsFor;
 
@@ -133,6 +136,20 @@ in
           developerInstructionsFlag = "-c developer_instructions=\"$(cat ${instructionsFile})\"";
         in
         "${unshadowedBinaryPathAssignment} ${codexHomeAssignment} ${binaryName} exec --dangerously-bypass-approvals-and-sandbox ${developerInstructionsFlag} ${lib.escapeShellArg agent.heartbeatPrompt}";
+
+      buildOneShotTurnCommandFor =
+        {
+          name,
+          instructionsFile,
+          ...
+        }:
+        let
+          inherit (cfg.harnesses.codex) binaryName;
+          codexHomeAssignment = "CODEX_HOME=${lib.escapeShellArg (codexHomeDirectory name)}";
+          developerInstructionsFlag = "-c developer_instructions=\"$(cat ${instructionsFile})\"";
+          resumeSubcommand = "\${CLAWDE_CHANNEL_SESSION_CONTINUATION:+resume --last}";
+        in
+        "${unshadowedBinaryPathAssignment} ${codexHomeAssignment} ${binaryName} exec ${resumeSubcommand} --dangerously-bypass-approvals-and-sandbox --output-last-message \"$CLAWDE_CHANNEL_REPLY_FILE\" ${developerInstructionsFlag} \"$CLAWDE_CHANNEL_PROMPT\"";
 
       workspaceFilesFor =
         {

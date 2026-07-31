@@ -75,6 +75,7 @@ let
       resolveChannelAdapterInstructions
       resolveChannelAdapterLaunchFlag
       resolveChannelAdapterEnvironmentSetter
+      getChannelAdapterFor
       getHarnessFor
       ;
     inherit (harnessRuntimeProfileHelpers) serializeHarnessRuntimeProfile;

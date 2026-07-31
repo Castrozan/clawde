@@ -34,6 +34,11 @@
             default = _: "";
             description = "Function: { name, agent, workspaceDirectory, harnessBinary } -> shell snippet appended to home.activation. Used for adapter-specific workspace seeding (secret injection, channel access files, and the like).";
           };
+          sidecarWindowSpecificationsFor = lib.mkOption {
+            type = lib.types.functionTo (lib.types.listOf (lib.types.attrsOf lib.types.anything));
+            default = _: [ ];
+            description = "Function: { name, agent, workspaceDirectory, oneShotTurnCommand } -> extra supervised windows this adapter needs beside the agent's own. Used when the harness carries no inbound transport of its own and the channel has to be bridged by a separate process. oneShotTurnCommand is null when the harness has no headless mode, which is the adapter's signal to emit nothing.";
+          };
           preActivation = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
             default = null;

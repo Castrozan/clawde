@@ -121,6 +121,11 @@ in
               type = lib.types.functionTo lib.types.str;
               description = "Function: { name, agent, workspaceDirectory, instructionsFile } -> the shell command that runs the agent's heartbeat prompt to completion and exits, for a launchOnTrigger agent that holds no warm session between firings.";
             };
+            buildOneShotTurnCommandFor = lib.mkOption {
+              type = lib.types.nullOr (lib.types.functionTo lib.types.str);
+              default = null;
+              description = "Function: { name, agent, workspaceDirectory, instructionsFile } -> the shell command that runs one turn of a conversation and exits, taking its prompt from $CLAWDE_CHANNEL_PROMPT, continuing the previous turn when $CLAWDE_CHANNEL_SESSION_CONTINUATION is non-empty, and leaving the assistant's reply and nothing else in the file named by $CLAWDE_CHANNEL_REPLY_FILE. Null means the harness has no headless mode, so channel adapters that drive it from a sidecar process cannot carry it.";
+            };
             runtimeProfile = lib.mkOption {
               type = runtimeProfileType;
               description = "Everything the python runtime needs to read and drive this harness's pane. Serialized into each agent's launch config so the supervisor, watchdog, heartbeat driver and resume nudge stay data-driven instead of branching on the harness name.";

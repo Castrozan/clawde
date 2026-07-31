@@ -36,6 +36,31 @@ let
   sharedDiscordAccessFile = "${homeDir}/.claude/channels/discord/access.json";
 
   mergeDiscordChannelAccessCommand = "${pkgs.python312}/bin/python3 ${../../scripts/merge-discord-channel-access.py}";
+
+  bridgePythonEnvironment = pkgs.python312.withPackages (pythonPackages: [
+    pythonPackages.discordpy
+  ]);
+
+  discordBridgeCommandFor =
+    {
+      name,
+      agent,
+      workspaceDirectory,
+      oneShotTurnCommand,
+    }:
+    let
+      tokenFile = lib.escapeShellArg "${secretsDirectory}/${toString agent.channel.discord.botTokenSecretName}";
+      hasToken = agent.channel.discord.botTokenSecretName != null;
+      waitForTokenPrefix = lib.optionalString hasToken "${waitForSecretScript} ${tokenFile} && ";
+      tokenAssignment = lib.optionalString hasToken "DISCORD_BOT_TOKEN=$(cat ${tokenFile}) ";
+      bridgeArguments = lib.concatStringsSep " " [
+        "--agent-name ${lib.escapeShellArg name}"
+        "--one-shot-turn-command ${lib.escapeShellArg oneShotTurnCommand}"
+        "--workspace-directory ${lib.escapeShellArg workspaceDirectory}"
+        "--state-directory ${lib.escapeShellArg (discordChannelEnvDirectoryFor name)}"
+      ];
+    in
+    "${waitForTokenPrefix}${tokenAssignment}PYTHONPATH=${./scripts} exec ${bridgePythonEnvironment}/bin/python3 ${./scripts/bridge.py} ${bridgeArguments}";
 in
 {
   options.clawde.agents = lib.mkOption {
@@ -88,6 +113,27 @@ in
         ];
         enabledPlugins."discord@claude-plugins-official" = true;
       };
+
+      sidecarWindowSpecificationsFor =
+        {
+          name,
+          agent,
+          workspaceDirectory,
+          oneShotTurnCommand,
+        }:
+        lib.optionals (oneShotTurnCommand != null) [
+          {
+            name = "${name}-discord";
+            wrapper_command = discordBridgeCommandFor {
+              inherit
+                name
+                agent
+                workspaceDirectory
+                oneShotTurnCommand
+                ;
+            };
+          }
+        ];
 
       agentActivationScriptFor =
         {
