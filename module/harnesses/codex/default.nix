@@ -62,18 +62,6 @@ let
   };
 in
 {
-  options.clawde.agents = lib.mkOption {
-    type = lib.types.attrsOf (
-      lib.types.submodule {
-        options.reasoningEffort = lib.mkOption {
-          type = lib.types.str;
-          default = "high";
-          description = "Reasoning effort for harnesses that expose it as a dial separate from the model. Ignored by harnesses that fold effort into the model identifier.";
-        };
-      }
-    );
-  };
-
   config = {
     clawde.harnesses.codex = {
       defaultModel = "gpt-5.6-sol";

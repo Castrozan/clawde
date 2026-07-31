@@ -3,5 +3,6 @@
   imports = [
     ./claude
     ./codex
+    ./opencode
   ];
 }

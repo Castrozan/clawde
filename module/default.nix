@@ -5,7 +5,7 @@
     ./options/agent-type-interfaces.nix
     ./options/harness-interfaces.nix
     ./options/host-wiring-interfaces.nix
-    ./options/options.nix
+    ./options/agent
     ./config/agent-assertions.nix
     ./harnesses
     ./agent-types
