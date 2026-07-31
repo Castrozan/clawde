@@ -11,6 +11,7 @@ let
     homeDir
     defaultTmuxSessionName
     clawdeRuntimePaths
+    clawdeServiceSpecification
     clawdeServiceSpecificationFile
     ;
 
@@ -116,11 +117,11 @@ let
   };
 in
 {
-  options.clawde.serviceSpecificationFile = lib.mkOption {
-    type = lib.types.nullOr lib.types.path;
+  options.clawde.serviceSpecification = lib.mkOption {
+    type = lib.types.attrs;
     readOnly = true;
-    default = if hasAgents then clawdeServiceSpecificationFile else null;
-    description = "Every supervised window the clawde service owns, agents and their sidecars alike, as the JSON the supervisor reads. Exposed so a configuration can assert over what will actually be brought up rather than over the options it set.";
+    default = clawdeServiceSpecification;
+    description = "Every supervised window the clawde service owns, agents and their sidecars alike, as the data the supervisor is handed. Exposed so a configuration can assert over what will actually be brought up rather than over the options it set, without forcing the specification file to build.";
   };
 
   config = lib.mkIf hasAgents {

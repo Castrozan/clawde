@@ -97,10 +97,12 @@ let
     agents = lib.concatMap buildAllSpecificationsForOneAgent (agentNamesInTmuxSession sessionName);
   };
 
+  clawdeServiceSpecification = {
+    sessions = map buildSessionSpecification distinctTmuxSessionNames;
+  };
+
   clawdeServiceSpecificationFile = pkgs.writeText "clawde-service-specification.json" (
-    builtins.toJSON {
-      sessions = map buildSessionSpecification distinctTmuxSessionNames;
-    }
+    builtins.toJSON clawdeServiceSpecification
   );
 in
 {
@@ -123,6 +125,7 @@ in
     effectiveAgentByName
     effectiveAgentForHarnessName
     eligibleHarnessNamesFor
+    clawdeServiceSpecification
     clawdeServiceSpecificationFile
     buildAgentInstructionsContentByName
     buildAgentLaunchConfigByName
