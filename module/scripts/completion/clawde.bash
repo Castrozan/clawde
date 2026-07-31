@@ -34,19 +34,31 @@ _clawde_agents_with_an_active_hours_gate() {
 	done
 }
 
+_clawde_eligible_harness_names_for_agent() {
+	clawde harness "$1" --eligible 2>/dev/null
+}
+
 _clawde() {
 	local current_word subcommand candidate_words
 	current_word="${COMP_WORDS[COMP_CWORD]}"
 	subcommand="${COMP_WORDS[1]:-}"
 
 	if [ "$COMP_CWORD" -eq 1 ]; then
-		mapfile -t COMPREPLY < <(compgen -W "active list start stop" -- "$current_word")
+		mapfile -t COMPREPLY < <(compgen -W "active harness list start stop" -- "$current_word")
 		return 0
 	fi
 
 	case "$subcommand" in
 	start | stop)
 		candidate_words="$(_clawde_on_demand_agent_names)"
+		;;
+	harness)
+		if [ "$COMP_CWORD" -ge 3 ]; then
+			candidate_words="$(_clawde_eligible_harness_names_for_agent "${COMP_WORDS[2]}")"
+		else
+			candidate_words="$(_clawde_deployed_agent_names)
+--clear"
+		fi
 		;;
 	active)
 		candidate_words="$(_clawde_agents_with_an_active_hours_gate)

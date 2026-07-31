@@ -14,10 +14,12 @@ let
     harnessBinaryFor
     getChannelAdapterFor
     getAgentTypeFor
-    getHarnessFor
-    distinctHarnessNamesInUse
     effectiveAgentByName
+    effectiveAgentForHarnessName
+    eligibleHarnessNamesFor
     ;
+
+  eligibleHarnessNamesAcrossAllAgents = lib.unique (lib.concatMap eligibleHarnessNamesFor agentNames);
 
   perAgentActivationLines =
     resolveProvider: providerSelector:
@@ -45,9 +47,22 @@ let
     perAgentActivationLines getAgentTypeFor (provider: provider.agentActivationScriptFor)
   );
 
-  runAllHarnessAgentActivations = pkgs.writeShellScript "clawde-run-all-harness-agent-activations" (
-    perAgentActivationLines getHarnessFor (provider: provider.agentActivationScriptFor)
-  );
+  perEligibleHarnessActivationLines = lib.concatMapStringsSep "\n" (
+    name:
+    lib.concatMapStringsSep "\n" (
+      harnessName:
+      let
+        agent = effectiveAgentForHarnessName name harnessName;
+      in
+      cfg.harnesses.${harnessName}.agentActivationScriptFor {
+        inherit name agent;
+        workspaceDirectory = agentWorkspaceDirectory name;
+        harnessBinary = harnessBinaryFor agent;
+      }
+    ) (eligibleHarnessNamesFor name)
+  ) agentNames;
+
+  runAllHarnessAgentActivations = pkgs.writeShellScript "clawde-run-all-harness-agent-activations" perEligibleHarnessActivationLines;
 
   preActivationLinesFor =
     registry: registeredNames:
@@ -72,7 +87,7 @@ in
       );
 
       runHarnessPreActivations = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-        preActivationLinesFor cfg.harnesses distinctHarnessNamesInUse
+        preActivationLinesFor cfg.harnesses eligibleHarnessNamesAcrossAllAgents
       );
 
       runChannelAdapterAgentActivations = lib.hm.dag.entryAfter [ "runChannelAdapterPreActivations" ] ''

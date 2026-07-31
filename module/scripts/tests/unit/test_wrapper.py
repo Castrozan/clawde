@@ -4,7 +4,10 @@ import pathlib
 import sys
 
 import pytest
-from harness_profile_test_helpers import CLAUDE_PROFILE_MAPPING
+from harness_profile_test_helpers import (
+    harness_launch_config_block,
+    CLAUDE_PROFILE_MAPPING,
+)
 
 AGENT_WRAPPER_DIRECTORY = (
     pathlib.Path(__file__).resolve().parent.parent.parent / "agent-wrapper"
@@ -34,8 +37,7 @@ def _write_launch_config(config_path, launch_command, daily_session_rotation=Fal
     config_path.write_text(
         json.dumps(
             {
-                "launch_command": launch_command,
-                "harness_runtime_profile": CLAUDE_PROFILE_MAPPING,
+                **harness_launch_config_block(CLAUDE_PROFILE_MAPPING, launch_command),
                 "heartbeat_driver_argv": None,
                 "active_hours_start": None,
                 "active_hours_end": None,
@@ -82,10 +84,9 @@ def _run_supervisor_capturing_session_argvs(monkeypatch, config_file, run_result
 def test_load_agent_launch_config_reads_json(tmp_path):
     config_file = _launch_config_path(tmp_path)
     _write_launch_config(config_file, "claude --name steward")
-    assert (
-        wrapper.load_agent_launch_config(str(config_file))["launch_command"]
-        == "claude --name steward"
-    )
+    assert wrapper.load_agent_launch_config(str(config_file))[
+        "harness_launch_commands"
+    ] == {"claude": "claude --name steward"}
 
 
 def test_supervise_rereads_config_on_each_restart(monkeypatch, tmp_path):

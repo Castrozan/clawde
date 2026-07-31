@@ -5,23 +5,29 @@
 }:
 let
   firstNonNull = preferred: fallback: if preferred != null then preferred else fallback;
-in
-{
-  effectiveAgentByName =
-    name:
+
+  effectiveAgentForHarnessName =
+    name: harnessName:
     let
-      agent = cfg.agents.${name};
+      declaredAgent = cfg.agents.${name};
+      agent = declaredAgent // {
+        harness = harnessName;
+      };
       agentType = getAgentTypeFor agent;
       harness = getHarnessFor agent;
       harnessDefaultModel = if harness != null then harness.defaultModel else null;
       typeDefault = selector: if agentType != null then selector agentType else null;
       typeList = selector: if agentType != null then selector agentType else [ ];
       typePersonality = if agentType != null then agentType.personalityTemplateFor agent else null;
+      declaredModelWhenSameHarness =
+        if harnessName == declaredAgent.harness then declaredAgent.model else null;
     in
     agent
     // {
-      model = firstNonNull agent.model (
-        firstNonNull (typeDefault (t: t.defaultModelByHarness.${agent.harness} or null)) harnessDefaultModel
+      model = firstNonNull (declaredAgent.modelByHarness.${harnessName} or null) (
+        firstNonNull declaredModelWhenSameHarness (
+          firstNonNull (typeDefault (t: t.defaultModelByHarness.${harnessName} or null)) harnessDefaultModel
+        )
       );
       permissionMode = firstNonNull agent.permissionMode (
         firstNonNull (typeDefault (t: t.defaultPermissionMode)) "default"
@@ -55,4 +61,9 @@ in
       denyToolPatterns = (typeList (t: t.defaultDenyToolPatterns)) ++ agent.denyToolPatterns;
       skillDirectories = agent.skillDirectories ++ (typeList (t: t.defaultSkillDirectories));
     };
+in
+{
+  inherit effectiveAgentForHarnessName;
+
+  effectiveAgentByName = name: effectiveAgentForHarnessName name cfg.agents.${name}.harness;
 }

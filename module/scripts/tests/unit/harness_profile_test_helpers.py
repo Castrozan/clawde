@@ -72,3 +72,12 @@ def make_claude_profile() -> HarnessRuntimeProfile:
 
 def make_codex_profile() -> HarnessRuntimeProfile:
     return HarnessRuntimeProfile(CODEX_PROFILE_MAPPING)
+
+
+def harness_launch_config_block(profile_mapping, launch_command):
+    harness_name = profile_mapping["harness_name"]
+    return {
+        "declared_harness": harness_name,
+        "harness_launch_commands": {harness_name: launch_command},
+        "harness_runtime_profiles": {harness_name: profile_mapping},
+    }

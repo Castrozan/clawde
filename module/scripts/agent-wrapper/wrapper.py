@@ -19,6 +19,11 @@ from redeploy_signals import (
     install_exit_signal_handlers,
     install_redeploy_signal_handler,
 )
+from active_harness import (
+    active_harness_name_for_launch_config,
+    active_launch_command,
+    active_runtime_profile_mapping,
+)
 from harness_runtime_profile import HarnessRuntimeProfile
 from heartbeat_driver_process import heartbeat_driver_log_path_for_agent
 from restart_scheduling import (
@@ -55,9 +60,10 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
             time.sleep(INITIAL_RESTART_DELAY_SECONDS)
             continue
 
-        launch_command = config["launch_command"]
+        active_harness = active_harness_name_for_launch_config(config, config_file_path)
+        launch_command = active_launch_command(config, active_harness)
         harness_runtime_profile = HarnessRuntimeProfile(
-            config["harness_runtime_profile"]
+            active_runtime_profile_mapping(config, active_harness)
         )
         heartbeat_driver_argv = config.get("heartbeat_driver_argv")
         active_hours_start = config.get("active_hours_start")

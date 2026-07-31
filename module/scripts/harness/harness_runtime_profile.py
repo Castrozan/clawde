@@ -2,7 +2,11 @@ import json
 import os
 import re
 
-HARNESS_RUNTIME_PROFILE_LAUNCH_CONFIG_KEY = "harness_runtime_profile"
+from active_harness import (
+    active_harness_name_for_launch_config,
+    active_runtime_profile_mapping,
+)
+
 SESSION_IDENTIFIER_TEMPLATE_PLACEHOLDER = "{session_identifier}"
 WORKSPACE_SLUG_TEMPLATE_PLACEHOLDER = "{workspace_slug}"
 NON_ALPHANUMERIC_CHARACTER = re.compile(r"[^a-zA-Z0-9]")
@@ -110,5 +114,8 @@ def load_harness_runtime_profile_from_launch_config(launch_config_path: str):
     with open(launch_config_path) as launch_config_file:
         launch_config = json.load(launch_config_file)
     return HarnessRuntimeProfile(
-        launch_config[HARNESS_RUNTIME_PROFILE_LAUNCH_CONFIG_KEY]
+        active_runtime_profile_mapping(
+            launch_config,
+            active_harness_name_for_launch_config(launch_config, launch_config_path),
+        )
     )

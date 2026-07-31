@@ -3,6 +3,8 @@ import json
 import pathlib
 import sys
 
+from harness_profile_test_helpers import harness_launch_config_block
+
 HEARTBEAT_DIRECTORY = (
     pathlib.Path(__file__).resolve().parent.parent.parent / "heartbeat"
 )
@@ -23,8 +25,9 @@ def write_launch_config(tmp_path, profile_mapping):
     launch_config_path.write_text(
         json.dumps(
             {
-                "launch_command": profile_mapping["harness_name"],
-                "harness_runtime_profile": profile_mapping,
+                **harness_launch_config_block(
+                    profile_mapping, profile_mapping["harness_name"]
+                ),
             }
         )
     )

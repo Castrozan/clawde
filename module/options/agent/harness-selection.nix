@@ -15,7 +15,12 @@
           model = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
             default = null;
-            description = "Model identifier in the harness's own vocabulary (claude aliases like opus/sonnet, codex ids like gpt-5.6-sol, opencode provider/model pairs). Null inherits the agent type's default, falling back to the harness's defaultModel.";
+            description = "Model identifier in the harness's own vocabulary (claude aliases like opus/sonnet, codex ids like gpt-5.6-sol, opencode provider/model pairs). Applies only to the declared harness, since a model name from one harness is meaningless to another. Null inherits the agent type's default, falling back to the harness's defaultModel.";
+          };
+          modelByHarness = lib.mkOption {
+            type = lib.types.attrsOf lib.types.str;
+            default = { };
+            description = "Model identifier per harness name, consulted before `model`. Pins what the agent runs on after `clawde harness <agent> <harness>` moves it to a harness other than the declared one; harnesses left unnamed here fall back to the agent type's default for that harness, then to the harness's own defaultModel.";
           };
           reasoningEffort = lib.mkOption {
             type = lib.types.str;

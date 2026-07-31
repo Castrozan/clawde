@@ -1,39 +1,21 @@
 import json
 import os
-import re
 import signal
 import subprocess
 import sys
 import time
 
-AGENT_WRAPPER_PROCESS_MATCH_PATTERN = "agent-wrapper/wrapper.py --agent-name"
+from agent_wrapper_processes import (
+    find_agent_wrapper_process_ids,
+    parse_agent_wrapper_command_line,
+    read_full_command_line,
+)
+
 GRACE_DELAY_SECONDS_BEFORE_SIGNALING = 2
 REDEPLOY_LOG_RELATIVE_PATH = "Library/Logs/clawde-redeploy.log"
 RESUME_NUDGE_SCRIPT_ENVIRONMENT_VARIABLE = "CLAWDE_RESUME_NUDGE_SCRIPT"
 HEARTBEAT_SCRIPTS_DIRECTORY_ENVIRONMENT_VARIABLE = "CLAWDE_HEARTBEAT_SCRIPTS_DIR"
 INHERITED_HERDR_PANE_ID_ENVIRONMENT_VARIABLE = "HERDR_PANE_ID"
-AGENT_NAME_PATTERN = re.compile(r"--agent-name (\S+)")
-CONFIG_FILE_PATTERN = re.compile(r"--config-file (\S+)")
-
-
-def find_agent_wrapper_process_ids() -> list[int]:
-    completed_process = subprocess.run(
-        ["pgrep", "-f", AGENT_WRAPPER_PROCESS_MATCH_PATTERN],
-        capture_output=True,
-        text=True,
-    )
-    return [
-        int(line) for line in completed_process.stdout.split() if line.strip().isdigit()
-    ]
-
-
-def read_full_command_line(process_id: int) -> str:
-    completed_process = subprocess.run(
-        ["ps", "-ww", "-p", str(process_id), "-o", "command="],
-        capture_output=True,
-        text=True,
-    )
-    return completed_process.stdout.strip()
 
 
 def read_tmux_session_from_launch_config(config_file_path: str) -> str | None:
@@ -47,20 +29,21 @@ def read_tmux_session_from_launch_config(config_file_path: str) -> str | None:
 def describe_agent_wrappers() -> list[dict]:
     agent_wrappers = []
     for process_id in find_agent_wrapper_process_ids():
-        command_line = read_full_command_line(process_id)
-        agent_name_match = AGENT_NAME_PATTERN.search(command_line)
-        config_file_match = CONFIG_FILE_PATTERN.search(command_line)
-        if not agent_name_match or not config_file_match:
+        parsed_command_line = parse_agent_wrapper_command_line(
+            read_full_command_line(process_id)
+        )
+        if parsed_command_line is None:
             continue
-        tmux_session = read_tmux_session_from_launch_config(config_file_match.group(1))
+        agent_name, config_file_path = parsed_command_line
+        tmux_session = read_tmux_session_from_launch_config(config_file_path)
         if tmux_session is None:
             continue
         agent_wrappers.append(
             {
                 "process_id": process_id,
-                "agent_name": agent_name_match.group(1),
+                "agent_name": agent_name,
                 "tmux_session": tmux_session,
-                "config_file_path": config_file_match.group(1),
+                "config_file_path": config_file_path,
             }
         )
     return agent_wrappers

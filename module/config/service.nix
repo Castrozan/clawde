@@ -17,6 +17,7 @@ let
   clawdeServiceScript = "${../scripts/clawde-service}/clawde-service.py";
 
   clawdeSessionStarter = pkgs.writeShellScriptBin "clawde" ''
+    export PYTHONPATH=${clawdePythonModuleSearchPath}
     case "''${1:-}" in
       active)
         shift
@@ -25,6 +26,10 @@ let
       list)
         shift
         exec ${pkgs.python312}/bin/python3 ${../scripts/agent-wrapper}/list_agents.py "$@"
+        ;;
+      harness)
+        shift
+        exec ${pkgs.python312}/bin/python3 ${../scripts/agent-wrapper}/harness_control.py "$@"
         ;;
       start|stop)
         exec ${pkgs.python312}/bin/python3 ${../scripts/agent-wrapper}/on_demand_control.py "$@"

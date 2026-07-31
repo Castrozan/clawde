@@ -18,5 +18,10 @@ let
     inherit cfg;
     inherit (registries) getAgentTypeFor getHarnessFor;
   };
+
+  eligibleHarnesses = import ./eligible-harnesses.nix {
+    inherit lib cfg;
+    inherit (effectiveAgent) effectiveAgentForHarnessName;
+  };
 in
-registries // effectiveAgent
+registries // effectiveAgent // eligibleHarnesses

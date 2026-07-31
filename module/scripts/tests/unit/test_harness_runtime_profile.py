@@ -3,6 +3,7 @@ import json
 import pytest
 from harness_profile_test_helpers import (
     CODEX_PROFILE_MAPPING,
+    harness_launch_config_block,
     make_claude_profile,
     make_codex_profile,
 )
@@ -141,8 +142,7 @@ def test_profile_loads_from_an_agent_launch_config(tmp_path):
     launch_config_path.write_text(
         json.dumps(
             {
-                "launch_command": "codex",
-                "harness_runtime_profile": CODEX_PROFILE_MAPPING,
+                **harness_launch_config_block(CODEX_PROFILE_MAPPING, "codex"),
             }
         )
     )

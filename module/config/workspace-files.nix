@@ -10,9 +10,11 @@ let
     hasAgents
     homeDir
     agentNames
+    cfg
     agentWorkspaceDirectory
     effectiveAgentByName
-    getHarnessFor
+    effectiveAgentForHarnessName
+    eligibleHarnessNamesFor
     getChannelAdapterFor
     ;
 
@@ -25,17 +27,23 @@ let
     in
     if adapter != null then adapter.workspaceSettingsFor { inherit name agent; } else { };
 
-  harnessWorkspaceFiles =
-    name:
+  workspaceFilesOnHarness =
+    name: harnessName:
     let
-      agent = effectiveAgentByName name;
+      agent = effectiveAgentForHarnessName name harnessName;
     in
-    (getHarnessFor agent).workspaceFilesFor {
+    cfg.harnesses.${harnessName}.workspaceFilesFor {
       inherit name agent;
       workspaceDirectory = agentWorkspaceDirectory name;
       workspaceRelativeToHome = workspaceRelativeToHome name;
-      channelWorkspaceSettings = resolveChannelWorkspaceSettings name agent;
+      channelWorkspaceSettings = resolveChannelWorkspaceSettings name (effectiveAgentByName name);
     };
+
+  harnessWorkspaceFiles =
+    name:
+    lib.foldl' (accumulated: harnessName: accumulated // workspaceFilesOnHarness name harnessName) { } (
+      eligibleHarnessNamesFor name
+    );
 
   allAgentWorkspaceFiles = lib.foldl' (
     accumulated: name: accumulated // harnessWorkspaceFiles name

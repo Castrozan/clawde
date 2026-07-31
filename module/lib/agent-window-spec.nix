@@ -2,6 +2,8 @@
   pkgs,
   lib,
   effectiveAgentByName,
+  effectiveAgentForHarnessName,
+  eligibleHarnessNamesFor,
   resolveAgentTypeInstructions,
   clawdeRuntimeInstructions,
   a2aPeerHelpers,
@@ -77,31 +79,42 @@ let
       agent.heartbeatGateCommand
     ];
 
-  buildAgentLaunchConfig =
-    name: agent:
-    let
-      inherit (getHarnessFor agent) runtimeProfile;
-    in
-    {
-      launch_command = buildAgentLaunchCommand name agent;
-      harness_runtime_profile = serializeHarnessRuntimeProfile agent.harness runtimeProfile;
-      heartbeat_driver_argv =
-        if (!agent.launchOnTrigger && agent.heartbeatInterval != null) then
-          buildHeartbeatDriverArgv name agent
-        else
-          null;
-      launch_gate_command = if agent.launchOnTrigger then agent.heartbeatGateCommand else null;
-      launch_gate_interval_seconds =
-        if agent.launchOnTrigger then agent.launchGateIntervalSeconds else null;
-      active_hours_start = agent.activeHoursStart;
-      active_hours_end = agent.activeHoursEnd;
-      active_weekdays_only = agent.activeWeekdaysOnly;
-      daily_session_rotation = agent.dailySessionRotation;
-      on_demand = agent.onDemand;
-      idle_timeout_minutes = agent.idleTimeoutMinutes;
-      workspace_directory = agentWorkspaceDirectory name;
-      tmux_session = agent.tmuxSession;
-    };
+  launchCommandByHarnessName =
+    name:
+    lib.genAttrs (eligibleHarnessNamesFor name) (
+      harnessName: buildAgentLaunchCommand name (effectiveAgentForHarnessName name harnessName)
+    );
+
+  runtimeProfileByHarnessName =
+    name:
+    lib.genAttrs (eligibleHarnessNamesFor name) (
+      harnessName:
+      serializeHarnessRuntimeProfile harnessName (getHarnessFor (
+        effectiveAgentForHarnessName name harnessName
+      )).runtimeProfile
+    );
+
+  buildAgentLaunchConfig = name: agent: {
+    declared_harness = agent.harness;
+    harness_launch_commands = launchCommandByHarnessName name;
+    harness_runtime_profiles = runtimeProfileByHarnessName name;
+    heartbeat_driver_argv =
+      if (!agent.launchOnTrigger && agent.heartbeatInterval != null) then
+        buildHeartbeatDriverArgv name agent
+      else
+        null;
+    launch_gate_command = if agent.launchOnTrigger then agent.heartbeatGateCommand else null;
+    launch_gate_interval_seconds =
+      if agent.launchOnTrigger then agent.launchGateIntervalSeconds else null;
+    active_hours_start = agent.activeHoursStart;
+    active_hours_end = agent.activeHoursEnd;
+    active_weekdays_only = agent.activeWeekdaysOnly;
+    daily_session_rotation = agent.dailySessionRotation;
+    on_demand = agent.onDemand;
+    idle_timeout_minutes = agent.idleTimeoutMinutes;
+    workspace_directory = agentWorkspaceDirectory name;
+    tmux_session = agent.tmuxSession;
+  };
 
   buildAgentLaunchConfigByName = name: buildAgentLaunchConfig name (effectiveAgentByName name);
 

@@ -51,6 +51,8 @@ let
     agentNamesOnHarness
     agentWorkspaceDirectory
     effectiveAgentByName
+    effectiveAgentForHarnessName
+    eligibleHarnessNamesFor
     resolveAgentTypeInstructions
     resolveChannelAdapterInstructions
     resolveChannelAdapterLaunchFlag
@@ -64,6 +66,8 @@ let
       pkgs
       lib
       effectiveAgentByName
+      effectiveAgentForHarnessName
+      eligibleHarnessNamesFor
       resolveAgentTypeInstructions
       clawdeRuntimeInstructions
       a2aPeerHelpers
@@ -116,6 +120,8 @@ in
     distinctHarnessNamesInUse
     agentNamesOnHarness
     effectiveAgentByName
+    effectiveAgentForHarnessName
+    eligibleHarnessNamesFor
     clawdeServiceSpecificationFile
     buildAgentInstructionsContentByName
     buildAgentLaunchConfigByName
