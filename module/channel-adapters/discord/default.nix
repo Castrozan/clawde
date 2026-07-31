@@ -41,8 +41,11 @@ let
     pythonPackages.discordpy
   ]);
 
+  discordBridgeIdentifyingArgumentsFor =
+    name: "--agent-name ${lib.escapeShellArg name} --one-shot-turn-command";
+
   discordBridgeProcessMatchPatternFor =
-    name: "${./scripts/bridge.py} --agent-name ${lib.escapeShellArg name} --one-shot-turn-command";
+    name: "bridge.py ${discordBridgeIdentifyingArgumentsFor name}";
 
   discordBridgeCommandFor =
     {
@@ -57,7 +60,7 @@ let
       waitForTokenPrefix = lib.optionalString hasToken "${waitForSecretScript} ${tokenFile} && ";
       tokenAssignment = lib.optionalString hasToken "DISCORD_BOT_TOKEN=$(cat ${tokenFile}) ";
       bridgeArguments = lib.concatStringsSep " " [
-        "${discordBridgeProcessMatchPatternFor name} ${lib.escapeShellArg oneShotTurnCommand}"
+        "${./scripts/bridge.py} ${discordBridgeIdentifyingArgumentsFor name} ${lib.escapeShellArg oneShotTurnCommand}"
         "--workspace-directory ${lib.escapeShellArg workspaceDirectory}"
         "--state-directory ${lib.escapeShellArg (discordChannelEnvDirectoryFor name)}"
       ];
