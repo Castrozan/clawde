@@ -59,15 +59,6 @@ let
       if entry.preActivation != null then entry.preActivation else ""
     ) registeredNames;
 
-  seedOneMemoryBridgeScript = pkgs.writeShellScript "seed-one-memory-bridge" (
-    builtins.readFile ../scripts/seed-memory-bridge.sh
-  );
-
-  seedAllMemoryBridges = pkgs.writeShellScript "seed-all-memory-bridges" (
-    lib.concatMapStringsSep "\n" (
-      name: "${seedOneMemoryBridgeScript} ${lib.escapeShellArg (agentWorkspaceDirectory name)}"
-    ) agentNames
-  );
 in
 {
   config = lib.mkIf hasAgents {
@@ -95,17 +86,6 @@ in
       runHarnessAgentActivations = lib.hm.dag.entryAfter [ "runHarnessPreActivations" ] ''
         run ${runAllHarnessAgentActivations}
       '';
-
-      seedAgentMemoryBridges =
-        lib.hm.dag.entryAfter
-          [
-            "runChannelAdapterAgentActivations"
-            "runAgentTypeActivations"
-            "runHarnessAgentActivations"
-          ]
-          ''
-            run ${seedAllMemoryBridges}
-          '';
     };
   };
 }

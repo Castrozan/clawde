@@ -30,7 +30,6 @@ _ensure_pm_artifacts_gitignored() {
 		return
 	fi
 	_ensure_pattern_in_gitignore ".pm/"
-	_ensure_pattern_in_gitignore "memory/"
 }
 
 main() {
