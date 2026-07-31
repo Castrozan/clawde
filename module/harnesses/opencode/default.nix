@@ -19,6 +19,8 @@ let
   agentConfigurationRelativeToHome = name: "${harnessHomeRelativeToHome name}/opencode.json";
   agentConfigurationFile = name: "${homeDir}/${agentConfigurationRelativeToHome name}";
 
+  channelBridgeStateDirectory = name: "${homeDir}/${harnessHomeRelativeToHome name}/channel-state";
+
   unshadowedBinaryDirectoryRelativeToHome = "${runtimeLocations.runtimeRootRelativeToHome}/harness-home/opencode/bin";
   unshadowedBinaryDirectory = "${homeDir}/${unshadowedBinaryDirectoryRelativeToHome}";
   unshadowedBinaryPathAssignment = "PATH=${lib.escapeShellArg unshadowedBinaryDirectory}:\"$PATH\"";
@@ -122,9 +124,10 @@ in
         let
           inherit (cfg.harnesses.opencode) binaryName;
           configurationAssignment = "OPENCODE_CONFIG=${lib.escapeShellArg (agentConfigurationFile name)}";
+          stateAssignment = "XDG_DATA_HOME=${lib.escapeShellArg (channelBridgeStateDirectory name)}";
           continueFlag = "\${CLAWDE_CHANNEL_SESSION_CONTINUATION:+--continue}";
         in
-        "${unshadowedBinaryPathAssignment} ${configurationAssignment} ${binaryName} run ${continueFlag} \"$CLAWDE_CHANNEL_PROMPT\" | ${extractReplyFromRunOutput} > \"$CLAWDE_CHANNEL_REPLY_FILE\"";
+        "${unshadowedBinaryPathAssignment} ${configurationAssignment} ${stateAssignment} ${binaryName} run ${continueFlag} \"$CLAWDE_CHANNEL_PROMPT\" | ${extractReplyFromRunOutput} > \"$CLAWDE_CHANNEL_REPLY_FILE\"";
 
       workspaceFilesFor =
         { name, agent, ... }:

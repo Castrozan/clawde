@@ -16,6 +16,9 @@ let
     name: "${runtimeLocations.runtimeRootRelativeToHome}/harness-home/codex/${name}";
   codexHomeDirectory = name: "${homeDir}/${codexHomeRelativeToHome name}";
 
+  channelBridgeHomeRelativeToHome = name: "${codexHomeRelativeToHome name}-channel";
+  channelBridgeHomeDirectory = name: "${homeDir}/${channelBridgeHomeRelativeToHome name}";
+
   unshadowedBinaryDirectoryRelativeToHome = "${runtimeLocations.runtimeRootRelativeToHome}/harness-home/codex/bin";
   unshadowedBinaryDirectory = "${homeDir}/${unshadowedBinaryDirectoryRelativeToHome}";
   unshadowedBinaryPathAssignment = "PATH=${lib.escapeShellArg unshadowedBinaryDirectory}:\"$PATH\"";
@@ -145,7 +148,7 @@ in
         }:
         let
           inherit (cfg.harnesses.codex) binaryName;
-          codexHomeAssignment = "CODEX_HOME=${lib.escapeShellArg (codexHomeDirectory name)}";
+          codexHomeAssignment = "CODEX_HOME=${lib.escapeShellArg (channelBridgeHomeDirectory name)}";
           developerInstructionsFlag = "-c developer_instructions=\"$(cat ${instructionsFile})\"";
           resumeSubcommand = "\${CLAWDE_CHANNEL_SESSION_CONTINUATION:+resume --last}";
         in
@@ -163,16 +166,28 @@ in
             codexConfigurationTomlFormat.generate "clawde-codex-config-${name}.toml" (
               buildCodexConfigurationFor agent workspaceDirectory
             );
+          "${channelBridgeHomeRelativeToHome name}/config.toml".source =
+            codexConfigurationTomlFormat.generate "clawde-codex-channel-config-${name}.toml" (
+              buildCodexConfigurationFor agent workspaceDirectory
+            );
         };
 
       agentActivationScriptFor =
         { name, agent, ... }:
-        lib.concatStringsSep " " [
-          seedCodexHarnessHomeScript
-          (lib.escapeShellArg (codexHomeDirectory name))
-          (lib.escapeShellArg userCodexAuthenticationFile)
-          (lib.escapeShellArg (lib.concatStringsSep "\n" agent.skillDirectories))
-        ];
+        lib.concatMapStringsSep "\n"
+          (
+            harnessHome:
+            lib.concatStringsSep " " [
+              seedCodexHarnessHomeScript
+              (lib.escapeShellArg harnessHome)
+              (lib.escapeShellArg userCodexAuthenticationFile)
+              (lib.escapeShellArg (lib.concatStringsSep "\n" agent.skillDirectories))
+            ]
+          )
+          [
+            (codexHomeDirectory name)
+            (channelBridgeHomeDirectory name)
+          ];
     };
 
     home.file = lib.optionalAttrs (hasCodexAgents && cfg.harnesses.codex.package != null) {
