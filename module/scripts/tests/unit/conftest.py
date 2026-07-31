@@ -10,6 +10,15 @@ sys.path.insert(
 sys.path.insert(
     0, str(pathlib.Path(__file__).resolve().parent.parent.parent / "agent-wrapper")
 )
+sys.path.insert(
+    0,
+    str(
+        pathlib.Path(__file__).resolve().parent.parent.parent.parent
+        / "channel-adapters"
+        / "discord"
+        / "scripts"
+    ),
+)
 
 
 @pytest.fixture(autouse=True)

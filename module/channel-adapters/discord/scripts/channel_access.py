@@ -41,15 +41,31 @@ def channel_requires_a_mention(access_document: dict, channel_identifier: str) -
     )
 
 
+def direct_messages_are_disabled(access_document: dict) -> bool:
+    return str(access_document.get("dmPolicy", "pairing")) == "disabled"
+
+
+def author_may_direct_message(access_document: dict, author_identifier: str) -> bool:
+    if direct_messages_are_disabled(access_document):
+        return False
+    allowed_authors = access_document.get("allowFrom", [])
+    if not isinstance(allowed_authors, list):
+        return False
+    return str(author_identifier) in {str(author) for author in allowed_authors}
+
+
 def message_is_for_this_agent(
     access_document: dict,
     channel_identifier: str,
     author_identifier: str,
     author_is_a_bot: bool,
     agent_was_mentioned: bool,
+    message_is_a_direct_message: bool,
 ) -> bool:
     if author_is_a_bot:
         return False
+    if message_is_a_direct_message:
+        return author_may_direct_message(access_document, author_identifier)
     if channel_identifier not in allowed_channel_identifiers(access_document):
         return False
     if not author_is_allowed_in_channel(

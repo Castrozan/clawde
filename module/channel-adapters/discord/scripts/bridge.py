@@ -58,6 +58,7 @@ class AgentBridgeClient(discord.Client):
             str(message.author.id),
             message.author.bot,
             self.user in message.mentions,
+            message.guild is None,
         ):
             return
         async with self.turn_lock:
