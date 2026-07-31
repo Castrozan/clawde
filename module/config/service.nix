@@ -116,6 +116,13 @@ let
   };
 in
 {
+  options.clawde.serviceSpecificationFile = lib.mkOption {
+    type = lib.types.nullOr lib.types.path;
+    readOnly = true;
+    default = if hasAgents then clawdeServiceSpecificationFile else null;
+    description = "Every supervised window the clawde service owns, agents and their sidecars alike, as the JSON the supervisor reads. Exposed so a configuration can assert over what will actually be brought up rather than over the options it set.";
+  };
+
   config = lib.mkIf hasAgents {
     home.packages = [
       clawdeSessionStarter
