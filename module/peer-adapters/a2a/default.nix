@@ -15,8 +15,10 @@ let
     _: harness: harness.meaningfulOutputLinePattern
   ) cfg.harnesses;
 
+  agentMetadataDocument = a2aHelpers.buildAgentMetadataDocument cfg.agents harnessMeaningfulLinePatterns;
+
   agentMetadataFile = pkgs.writeText "clawde-a2a-agent-metadata.json" (
-    builtins.toJSON (a2aHelpers.buildAgentMetadataDocument cfg.agents harnessMeaningfulLinePatterns)
+    builtins.toJSON agentMetadataDocument
   );
 
   fleetDaemonExecArguments = a2aHelpers.fleetDaemonExecArguments {
@@ -74,11 +76,11 @@ in
       default = 7000;
       description = "Bind port for the A2A daemon. One port serves the whole fleet; each agent is addressed by path under /agents/<name>.";
     };
-    agentMetadataFile = lib.mkOption {
-      type = lib.types.path;
+    agentMetadata = lib.mkOption {
+      type = lib.types.attrs;
       readOnly = true;
-      default = agentMetadataFile;
-      description = "Descriptions and line-pattern overrides the daemon merges onto the agents it discovers. Exposed so a configuration can assert over what the daemon will actually read.";
+      default = agentMetadataDocument;
+      description = "Descriptions and line-pattern overrides the daemon merges onto the agents it discovers. Exposed as data so a configuration can assert over what the daemon will actually read without forcing the metadata file to build.";
     };
   };
 
