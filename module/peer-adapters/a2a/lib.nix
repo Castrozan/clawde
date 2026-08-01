@@ -52,37 +52,34 @@ let
 
   buildA2APeerCommand =
     name: agent: harnessMeaningfulOutputLinePattern:
-    pkgs.writeShellScript "clawde-a2a-peer-${name}" (
-      lib.concatStringsSep " " (
-        [
-          "exec"
-          "env"
-          "PYTHONPATH=${repoAgentsDirectory}"
-          "${pkgs.python312}/bin/python3"
-          "-m"
-          "a2a_server"
-          "--agent-name"
-          (lib.escapeShellArg name)
-          "--agent-description"
-          (lib.escapeShellArg (resolveA2APeerCardDescription name agent))
-          "--listen-host"
-          (lib.escapeShellArg agent.expose.a2a.listenHost)
-          "--listen-port"
-          (toString agent.expose.a2a.listenPort)
-          "--public-endpoint-url"
-          (lib.escapeShellArg (resolveA2APeerPublicEndpointUrl agent))
-          "--meaningful-line-pattern"
-          (lib.escapeShellArg (resolveA2APeerMeaningfulLinePattern agent harnessMeaningfulOutputLinePattern))
-        ]
-        ++ attachmentArgumentsForTheLiveMultiplexer name agent
-      )
+    lib.concatStringsSep " " (
+      [
+        "env"
+        "PYTHONPATH=${repoAgentsDirectory}"
+        "${pkgs.python312}/bin/python3"
+        "-m"
+        "a2a_server"
+        "--agent-name"
+        (lib.escapeShellArg name)
+        "--agent-description"
+        (lib.escapeShellArg (resolveA2APeerCardDescription name agent))
+        "--listen-host"
+        (lib.escapeShellArg agent.expose.a2a.listenHost)
+        "--listen-port"
+        (toString agent.expose.a2a.listenPort)
+        "--public-endpoint-url"
+        (lib.escapeShellArg (resolveA2APeerPublicEndpointUrl agent))
+        "--meaningful-line-pattern"
+        (lib.escapeShellArg (resolveA2APeerMeaningfulLinePattern agent harnessMeaningfulOutputLinePattern))
+      ]
+      ++ attachmentArgumentsForTheLiveMultiplexer name agent
     );
 
   a2aPeerProcessMatchPatternFor = name: "a2a_server --agent-name ${name} --agent-description";
 
   buildA2APeerSidecarSpecification = name: agent: harnessMeaningfulOutputLinePattern: {
     name = "${name}-a2a";
-    command = "${buildA2APeerCommand name agent harnessMeaningfulOutputLinePattern}";
+    command = buildA2APeerCommand name agent harnessMeaningfulOutputLinePattern;
     process_match_pattern = a2aPeerProcessMatchPatternFor name;
   };
 in
