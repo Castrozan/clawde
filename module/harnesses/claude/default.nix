@@ -96,7 +96,7 @@ in
           ...
         }:
         let
-          inherit (cfg.harnesses.claude) binaryName;
+          inherit (cfg.harnesses.claude) binaryInvocation;
           modelFlag = "--model ${agent.model}";
           nameFlag = "--name ${name}";
           permissionModeFlag = "--permission-mode ${agent.permissionMode}";
@@ -106,7 +106,7 @@ in
           appendSystemPromptFlag = "--append-system-prompt \"$(cat ${instructionsFile})\"";
           mcpConfigFlags = agentScopedMcpConfigFlagsFor name agent;
         in
-        "${binaryName} ${sessionArgvShellExpansion} ${channelLaunchFlags} ${modelFlag} ${nameFlag} ${permissionModeFlag} ${mcpConfigFlags}${appendSystemPromptFlag} ${skillDirectoryFlags}";
+        "${binaryInvocation} ${sessionArgvShellExpansion} ${channelLaunchFlags} ${modelFlag} ${nameFlag} ${permissionModeFlag} ${mcpConfigFlags}${appendSystemPromptFlag} ${skillDirectoryFlags}";
 
       buildRunOnceCommandFor =
         {
@@ -116,7 +116,7 @@ in
           ...
         }:
         let
-          inherit (cfg.harnesses.claude) binaryName;
+          inherit (cfg.harnesses.claude) binaryInvocation;
           runOncePrintFlag = "--print ${lib.escapeShellArg agent.heartbeatPrompt}";
           modelFlag = "--model ${agent.model}";
           nameFlag = "--name ${name}";
@@ -127,7 +127,7 @@ in
           appendSystemPromptFlag = "--append-system-prompt \"$(cat ${instructionsFile})\"";
           mcpConfigFlags = agentScopedMcpConfigFlagsFor name agent;
         in
-        "${binaryName} ${runOncePrintFlag} \${CLAWDE_SESSION_ARGV:-} ${modelFlag} ${nameFlag} ${permissionModeFlag} ${mcpConfigFlags}${appendSystemPromptFlag} ${skillDirectoryFlags}";
+        "${binaryInvocation} ${runOncePrintFlag} \${CLAWDE_SESSION_ARGV:-} ${modelFlag} ${nameFlag} ${permissionModeFlag} ${mcpConfigFlags}${appendSystemPromptFlag} ${skillDirectoryFlags}";
 
       workspaceFilesFor =
         {

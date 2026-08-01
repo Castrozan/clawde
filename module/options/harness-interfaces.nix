@@ -96,7 +96,7 @@ in
   options.clawde.harnesses = lib.mkOption {
     type = lib.types.attrsOf (
       lib.types.submodule (
-        { name, ... }:
+        { name, config, ... }:
         {
           options = {
             package = lib.mkOption {
@@ -108,6 +108,12 @@ in
               type = lib.types.str;
               default = name;
               description = "Executable name resolved from the agent's runtime PATH rather than a store path, so a harness upgrade does not rewrite every agent launch command and force a cold respawn.";
+            };
+            binaryInvocation = lib.mkOption {
+              type = lib.types.str;
+              readOnly = true;
+              default = "command ${config.binaryName}";
+              description = "How a launch command must name the harness binary. Every builder below starts its command with this rather than with binaryName, because the command runs through a shell that expands aliases and shell functions before it ever consults PATH, so a user who aliases the harness name to a wrapper of their own silently replaces the flags clawde built with the wrapper's, and the harness dies at argument parsing. The command builtin resolves the name the way PATH says and leaves an alias no chance to rewrite it.";
             };
             defaultModel = lib.mkOption {
               type = lib.types.str;

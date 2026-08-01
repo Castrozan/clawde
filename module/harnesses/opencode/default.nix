@@ -102,10 +102,10 @@ in
           ...
         }:
         let
-          inherit (cfg.harnesses.opencode) binaryName;
+          inherit (cfg.harnesses.opencode) binaryInvocation;
           configurationAssignment = "OPENCODE_CONFIG=${lib.escapeShellArg (agentConfigurationFile name)}";
         in
-        "${unshadowedBinaryPathAssignment} ${configurationAssignment} ${binaryName} ${sessionArgvShellExpansion}";
+        "${unshadowedBinaryPathAssignment} ${configurationAssignment} ${binaryInvocation} ${sessionArgvShellExpansion}";
 
       buildRunOnceCommandFor =
         {
@@ -114,20 +114,20 @@ in
           ...
         }:
         let
-          inherit (cfg.harnesses.opencode) binaryName;
+          inherit (cfg.harnesses.opencode) binaryInvocation;
           configurationAssignment = "OPENCODE_CONFIG=${lib.escapeShellArg (agentConfigurationFile name)}";
         in
-        "${unshadowedBinaryPathAssignment} ${configurationAssignment} ${binaryName} run ${lib.escapeShellArg agent.heartbeatPrompt}";
+        "${unshadowedBinaryPathAssignment} ${configurationAssignment} ${binaryInvocation} run ${lib.escapeShellArg agent.heartbeatPrompt}";
 
       buildOneShotTurnCommandFor =
         { name, ... }:
         let
-          inherit (cfg.harnesses.opencode) binaryName;
+          inherit (cfg.harnesses.opencode) binaryInvocation;
           configurationAssignment = "OPENCODE_CONFIG=${lib.escapeShellArg (agentConfigurationFile name)}";
           stateAssignment = "XDG_DATA_HOME=${lib.escapeShellArg (channelBridgeStateDirectory name)}";
           continueFlag = "\${CLAWDE_CHANNEL_SESSION_CONTINUATION:+--continue}";
         in
-        "${unshadowedBinaryPathAssignment} ${configurationAssignment} ${stateAssignment} ${binaryName} run ${continueFlag} \"$CLAWDE_CHANNEL_PROMPT\" | ${extractReplyFromRunOutput} > \"$CLAWDE_CHANNEL_REPLY_FILE\"";
+        "${unshadowedBinaryPathAssignment} ${configurationAssignment} ${stateAssignment} ${binaryInvocation} run ${continueFlag} \"$CLAWDE_CHANNEL_PROMPT\" | ${extractReplyFromRunOutput} > \"$CLAWDE_CHANNEL_REPLY_FILE\"";
 
       workspaceFilesFor =
         { name, agent, ... }:
