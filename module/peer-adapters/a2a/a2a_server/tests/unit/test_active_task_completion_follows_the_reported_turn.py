@@ -48,7 +48,7 @@ def submit_a_task_then_observe(busy_states_to_replay: list[bool | None]):
     )
     task, _ = coordinator.submit_new_task_if_idle("ping")
     for _ in busy_states_to_replay:
-        coordinator._observe_once_and_apply_to_active_task()
+        coordinator.observe_once_and_apply_to_active_task()
     return task_store.get_task(task.id)
 
 
@@ -80,9 +80,9 @@ class TestCompletionFollowsTheReportedTurn:
             ),
         )
         first_task, _ = coordinator.submit_new_task_if_idle("first")
-        coordinator._observe_once_and_apply_to_active_task()
-        coordinator._observe_once_and_apply_to_active_task()
+        coordinator.observe_once_and_apply_to_active_task()
+        coordinator.observe_once_and_apply_to_active_task()
         assert task_store.get_task(first_task.id).state == "completed"
         second_task, _ = coordinator.submit_new_task_if_idle("second")
-        coordinator._observe_once_and_apply_to_active_task()
+        coordinator.observe_once_and_apply_to_active_task()
         assert task_store.get_task(second_task.id).state == "working"

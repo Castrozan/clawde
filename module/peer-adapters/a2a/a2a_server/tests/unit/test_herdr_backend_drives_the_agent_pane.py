@@ -16,61 +16,54 @@ def commands_sent_to_the_pane(fleet):
     ]
 
 
+def fleet_hosting_jenny(monkeypatch):
+    fleet = FakeHerdrFleet().with_agent_pane("w1:p9", tab_label="jenny")
+    fleet.install_into(monkeypatch)
+    return fleet
+
+
 class TestSendInputText:
     def test_types_the_text_and_then_presses_enter(self, monkeypatch):
-        fleet = FakeHerdrFleet().with_agent_pane("clawde", "jenny", "w1:p9")
-        fleet.install_into(monkeypatch)
-        backend = HerdrAttachedAgentBackend("clawde", "jenny")
-        backend.send_input_text("ping")
+        fleet = fleet_hosting_jenny(monkeypatch)
+        HerdrAttachedAgentBackend("w1:p9").send_input_text("ping")
         assert commands_sent_to_the_pane(fleet) == [
             ["pane", "send-text", "w1:p9", "ping"],
             ["pane", "send-keys", "w1:p9", "Enter"],
         ]
 
-    def test_refuses_to_swallow_input_when_no_pane_hosts_the_agent(self, monkeypatch):
-        FakeHerdrFleet().with_agent_pane("clawde", "steward", "w1:p9").install_into(
-            monkeypatch
-        )
-        backend = HerdrAttachedAgentBackend("clawde", "jenny")
-        with pytest.raises(RuntimeError, match="jenny"):
-            backend.send_input_text("ping")
-
 
 class TestCancelGracefully:
     def test_interrupts_the_agent_pane(self, monkeypatch):
-        fleet = FakeHerdrFleet().with_agent_pane("clawde", "jenny", "w1:p9")
-        fleet.install_into(monkeypatch)
-        backend = HerdrAttachedAgentBackend("clawde", "jenny")
-        backend.cancel_gracefully()
+        fleet = fleet_hosting_jenny(monkeypatch)
+        HerdrAttachedAgentBackend("w1:p9").cancel_gracefully()
         assert commands_sent_to_the_pane(fleet) == [
             ["pane", "send-keys", "w1:p9", "C-c"]
         ]
 
-    def test_stays_quiet_when_no_pane_hosts_the_agent(self, monkeypatch):
-        fleet = FakeHerdrFleet().with_agent_pane("clawde", "steward", "w1:p9")
-        fleet.install_into(monkeypatch)
-        backend = HerdrAttachedAgentBackend("clawde", "jenny")
-        backend.cancel_gracefully()
-        assert commands_sent_to_the_pane(fleet) == []
-
 
 class TestStop:
     def test_never_closes_the_pane_it_only_attached_to(self, monkeypatch):
-        fleet = FakeHerdrFleet().with_agent_pane("clawde", "jenny", "w1:p9")
-        fleet.install_into(monkeypatch)
-        backend = HerdrAttachedAgentBackend("clawde", "jenny")
+        fleet = fleet_hosting_jenny(monkeypatch)
+        backend = HerdrAttachedAgentBackend("w1:p9")
         backend.start()
         fleet.invocations.clear()
         backend.stop()
         assert fleet.invocations == []
 
-    def test_reattaches_from_scratch_after_stopping(self, monkeypatch):
-        fleet = FakeHerdrFleet().with_agent_pane("clawde", "jenny", "w1:p9")
-        fleet.showing("⏺ said before the peer restarted\n")
-        fleet.install_into(monkeypatch)
-        backend = HerdrAttachedAgentBackend("clawde", "jenny")
+
+class TestAPaneThatWentAway:
+    def test_observe_reports_the_agent_gone_rather_than_raising(self, monkeypatch):
+        fleet = fleet_hosting_jenny(monkeypatch)
+        backend = HerdrAttachedAgentBackend("w1:p9")
         backend.start()
-        backend.stop()
+        fleet.with_pane_removed("w1:p9")
+        assert backend.observe().is_alive is False
+
+    def test_observe_never_captures_text_from_a_pane_that_is_gone(self, monkeypatch):
+        fleet = fleet_hosting_jenny(monkeypatch)
+        backend = HerdrAttachedAgentBackend("w1:p9")
+        backend.start()
+        fleet.with_pane_removed("w1:p9")
         fleet.invocations.clear()
-        assert backend.observe().is_alive is True
-        assert ["workspace", "list"] in fleet.invocations
+        backend.observe()
+        assert fleet.invocations_matching(["pane", "read"]) == []

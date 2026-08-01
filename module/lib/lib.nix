@@ -31,10 +31,7 @@ let
     + "\n"
     + builtins.readFile ../snippets/rebuild.md;
 
-  a2aPeerHelpers = import ../peer-adapters/a2a/lib.nix {
-    inherit pkgs lib;
-    inherit (config.clawde) multiplexer;
-  };
+  a2aPeerHelpers = import ../peer-adapters/a2a/lib.nix { inherit pkgs lib; };
 
   agentResolution = import ./agent-resolution {
     inherit

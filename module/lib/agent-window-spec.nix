@@ -164,18 +164,10 @@ let
         }
       );
 
-  a2aPeerSidecarProcessesForAgent =
-    name: agent:
-    map (sidecar: sidecar // { log_file = sidecarProcessLogFile sidecar.name; }) (
-      a2aPeerHelpers.peerSidecarProcessSpecificationsForAgent name agent
-        (getHarnessFor agent).meaningfulOutputLinePattern
-    );
-
   buildAgentSpecification = name: agent: {
     inherit name;
     wrapper_command = "exec ${buildAgentWindowCommand name agent}";
-    sidecar_processes =
-      channelSidecarProcessesForAgent name agent ++ a2aPeerSidecarProcessesForAgent name agent;
+    sidecar_processes = channelSidecarProcessesForAgent name agent;
   };
 
   buildSpecificationForOneAgent = name: buildAgentSpecification name (effectiveAgentByName name);
