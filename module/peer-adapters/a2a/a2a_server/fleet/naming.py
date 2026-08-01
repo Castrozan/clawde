@@ -11,11 +11,15 @@ def sanitize_for_use_in_a_url_path(candidate: str) -> str:
     return CHARACTERS_A_PEER_NAME_MAY_NOT_CARRY.sub("-", candidate).strip("-")
 
 
+def label_says_something_a_caller_could_route_on(label: str | None) -> bool:
+    return bool(label) and not label.strip().isdigit()
+
+
 def preferred_name_for_pane(
     pane: DiscoveredAgentPane, tab_labels_by_tab_id: dict[str, str]
 ) -> str:
     tab_label = tab_labels_by_tab_id.get(pane.tab_id)
-    if tab_label:
+    if label_says_something_a_caller_could_route_on(tab_label):
         return sanitize_for_use_in_a_url_path(tab_label)
     if pane.working_directory:
         directory_name = os.path.basename(pane.working_directory.rstrip("/"))

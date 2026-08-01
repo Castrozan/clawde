@@ -80,3 +80,26 @@ def test_discovery_reads_the_whole_fleet_with_one_call_per_collection(monkeypatc
 
     assert len(fleet.invocations_matching(["pane", "list"])) == 1
     assert len(fleet.invocations_matching(["tab", "list"])) == 1
+
+
+def test_a_tab_numbered_rather_than_named_falls_through_to_its_directory(monkeypatch):
+    fleet = FakeHerdrFleet().with_agent_pane(
+        "wS:p12", tab_label="3", cwd="/Users/lucas/repo/dotfiles"
+    )
+    fleet.install_into(monkeypatch)
+
+    assert discovered_names(fleet) == {"wS:p12": "dotfiles"}
+
+
+def test_two_numbered_tabs_in_one_repo_stay_distinct(monkeypatch):
+    fleet = (
+        FakeHerdrFleet()
+        .with_agent_pane("wS:p1", tab_label="2", cwd="/repo/dotfiles")
+        .with_agent_pane("wS:p2", tab_label="3", cwd="/repo/dotfiles")
+    )
+    fleet.install_into(monkeypatch)
+
+    assert discovered_names(fleet) == {
+        "wS:p1": "dotfiles-wS-p1",
+        "wS:p2": "dotfiles-wS-p2",
+    }
