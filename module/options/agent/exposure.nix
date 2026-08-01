@@ -15,7 +15,7 @@
                     enable = lib.mkOption {
                       type = lib.types.bool;
                       default = false;
-                      description = "Expose this agent as an A2A peer over HTTP. Spawns a sibling window running the a2a-server wrapping this agent.";
+                      description = "Expose this agent as an A2A peer over HTTP. The supervisor runs the a2a-server as a headless sidecar process beside the agent, attached to whichever multiplexer hosts it, so the agent's own window stays the single thing a human opens.";
                     };
                     listenHost = lib.mkOption {
                       type = lib.types.str;

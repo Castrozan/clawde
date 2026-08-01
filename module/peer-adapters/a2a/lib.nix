@@ -1,6 +1,7 @@
 {
   pkgs,
   lib,
+  multiplexer,
 }:
 let
   a2aPeerAdapterInstructions = builtins.readFile ./instructions/a2a-peer-runtime.md;
@@ -28,49 +29,70 @@ let
     else
       harnessMeaningfulOutputLinePattern;
 
-  buildA2APeerWindowCommand =
-    name: agent: harnessMeaningfulOutputLinePattern:
-    pkgs.writeShellScript "clawde-a2a-peer-${name}" (
-      lib.concatStringsSep " " [
-        "exec"
-        "env"
-        "PYTHONPATH=${repoAgentsDirectory}"
-        "${pkgs.python312}/bin/python3"
-        "-m"
-        "a2a_server"
-        "--agent-name"
+  attachmentArgumentsForTheLiveMultiplexer =
+    name: agent:
+    if multiplexer == "herdr" then
+      [
+        "--backend-type"
+        "herdr"
+        "--herdr-workspace-label"
+        (lib.escapeShellArg agent.tmuxSession)
+        "--herdr-tab-label"
         (lib.escapeShellArg name)
-        "--agent-description"
-        (lib.escapeShellArg (resolveA2APeerCardDescription name agent))
-        "--listen-host"
-        (lib.escapeShellArg agent.expose.a2a.listenHost)
-        "--listen-port"
-        (toString agent.expose.a2a.listenPort)
-        "--public-endpoint-url"
-        (lib.escapeShellArg (resolveA2APeerPublicEndpointUrl agent))
+      ]
+    else
+      [
         "--backend-type"
         "tmux"
-        "--tmux-meaningful-line-pattern"
-        (lib.escapeShellArg (resolveA2APeerMeaningfulLinePattern agent harnessMeaningfulOutputLinePattern))
         "--tmux-session-name"
         (lib.escapeShellArg agent.tmuxSession)
         "--tmux-window-name"
         (lib.escapeShellArg name)
-      ]
+      ];
+
+  buildA2APeerCommand =
+    name: agent: harnessMeaningfulOutputLinePattern:
+    pkgs.writeShellScript "clawde-a2a-peer-${name}" (
+      lib.concatStringsSep " " (
+        [
+          "exec"
+          "env"
+          "PYTHONPATH=${repoAgentsDirectory}"
+          "${pkgs.python312}/bin/python3"
+          "-m"
+          "a2a_server"
+          "--agent-name"
+          (lib.escapeShellArg name)
+          "--agent-description"
+          (lib.escapeShellArg (resolveA2APeerCardDescription name agent))
+          "--listen-host"
+          (lib.escapeShellArg agent.expose.a2a.listenHost)
+          "--listen-port"
+          (toString agent.expose.a2a.listenPort)
+          "--public-endpoint-url"
+          (lib.escapeShellArg (resolveA2APeerPublicEndpointUrl agent))
+          "--meaningful-line-pattern"
+          (lib.escapeShellArg (resolveA2APeerMeaningfulLinePattern agent harnessMeaningfulOutputLinePattern))
+        ]
+        ++ attachmentArgumentsForTheLiveMultiplexer name agent
+      )
     );
 
-  buildA2APeerWindowSpecification = name: agent: harnessMeaningfulOutputLinePattern: {
+  a2aPeerProcessMatchPatternFor = name: "a2a_server --agent-name ${name} --agent-description";
+
+  buildA2APeerSidecarSpecification = name: agent: harnessMeaningfulOutputLinePattern: {
     name = "${name}-a2a";
-    wrapper_command = "${buildA2APeerWindowCommand name agent harnessMeaningfulOutputLinePattern}";
+    command = "${buildA2APeerCommand name agent harnessMeaningfulOutputLinePattern}";
+    process_match_pattern = a2aPeerProcessMatchPatternFor name;
   };
 in
 {
   instructionsBlockForAgent =
     agent: if agent.expose.a2a.enable then a2aPeerAdapterInstructions else "";
 
-  peerWindowSpecificationsForAgent =
+  peerSidecarProcessSpecificationsForAgent =
     name: agent: harnessMeaningfulOutputLinePattern:
     lib.optional agent.expose.a2a.enable (
-      buildA2APeerWindowSpecification name agent harnessMeaningfulOutputLinePattern
+      buildA2APeerSidecarSpecification name agent harnessMeaningfulOutputLinePattern
     );
 }

@@ -3,6 +3,7 @@ import subprocess
 import time
 
 from .base import AgentBackend, BackendObservation
+from .meaningful_line_tracking import MeaningfulLineTracker
 
 PANE_CAPTURE_LINE_COUNT = 200
 DELAY_BETWEEN_TYPING_INPUT_AND_PRESSING_ENTER_SECONDS = 0.25
@@ -17,10 +18,7 @@ class TmuxAttachedAgentBackend(AgentBackend):
     ) -> None:
         self._tmux_session_name = tmux_session_name
         self._tmux_window_name = tmux_window_name
-        self._meaningful_line_pattern = meaningful_line_pattern
-        self._previously_observed_meaningful_line_occurrence_keys: set[
-            tuple[str, int]
-        ] = set()
+        self._meaningful_line_tracker = MeaningfulLineTracker(meaningful_line_pattern)
         self._last_activity_at_epoch_seconds = time.time()
 
     def start(self) -> None:
@@ -29,11 +27,8 @@ class TmuxAttachedAgentBackend(AgentBackend):
                 f"tmux target {self._target_specifier()!r} does not exist; "
                 "the backend attaches to an already-running window"
             )
-        initial_capture_text = self._capture_pane_text()
-        self._previously_observed_meaningful_line_occurrence_keys = set(
-            self._extract_meaningful_line_occurrence_keys_in_capture_order(
-                initial_capture_text
-            )
+        self._meaningful_line_tracker.adopt_capture_as_baseline(
+            self._capture_pane_text()
         )
 
     def send_input_text(self, text: str) -> None:
@@ -45,27 +40,13 @@ class TmuxAttachedAgentBackend(AgentBackend):
         self._last_activity_at_epoch_seconds = time.time()
 
     def observe(self) -> BackendObservation:
-        current_capture_text = self._capture_pane_text()
-        current_occurrence_keys_in_order = list(
-            self._extract_meaningful_line_occurrence_keys_in_capture_order(
-                current_capture_text
+        new_lines_in_capture_order = (
+            self._meaningful_line_tracker.lines_appearing_since_the_previous_capture(
+                self._capture_pane_text()
             )
         )
-        current_occurrence_keys_as_set = set(current_occurrence_keys_in_order)
-        newly_appeared_occurrence_keys = (
-            current_occurrence_keys_as_set
-            - self._previously_observed_meaningful_line_occurrence_keys
-        )
-        new_lines_in_capture_order = [
-            line
-            for (line, _occurrence_index) in current_occurrence_keys_in_order
-            if (line, _occurrence_index) in newly_appeared_occurrence_keys
-        ]
         if new_lines_in_capture_order:
             self._last_activity_at_epoch_seconds = time.time()
-        self._previously_observed_meaningful_line_occurrence_keys = (
-            current_occurrence_keys_as_set
-        )
         return BackendObservation(
             raw_output_since_last_call="\n".join(new_lines_in_capture_order),
             is_alive=self._target_tmux_window_exists(),
@@ -76,7 +57,10 @@ class TmuxAttachedAgentBackend(AgentBackend):
         self._run_tmux_command(["send-keys", "-t", self._target_specifier(), "C-c"])
 
     def stop(self) -> None:
-        self._run_tmux_command(["kill-window", "-t", self._target_specifier()])
+        self._detach_leaving_the_wrapped_agent_running()
+
+    def _detach_leaving_the_wrapped_agent_running(self) -> None:
+        self._meaningful_line_tracker.forget_everything_observed_so_far()
 
     def _target_specifier(self) -> str:
         return f"{self._tmux_session_name}:{self._tmux_window_name}"
@@ -112,24 +96,3 @@ class TmuxAttachedAgentBackend(AgentBackend):
             text=True,
             check=False,
         )
-
-    def _extract_meaningful_line_occurrence_keys_in_capture_order(
-        self, capture_text: str
-    ):
-        per_line_occurrence_counters: dict[str, int] = {}
-        for raw_line in capture_text.splitlines():
-            normalized = raw_line.strip()
-            if not normalized:
-                continue
-            if (
-                self._meaningful_line_pattern is not None
-                and not self._meaningful_line_pattern.search(normalized)
-            ):
-                continue
-            occurrence_index_for_this_line = per_line_occurrence_counters.get(
-                normalized, 0
-            )
-            yield (normalized, occurrence_index_for_this_line)
-            per_line_occurrence_counters[normalized] = (
-                occurrence_index_for_this_line + 1
-            )

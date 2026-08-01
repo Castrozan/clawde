@@ -31,7 +31,10 @@ let
     + "\n"
     + builtins.readFile ../snippets/rebuild.md;
 
-  a2aPeerHelpers = import ../peer-adapters/a2a/lib.nix { inherit pkgs lib; };
+  a2aPeerHelpers = import ../peer-adapters/a2a/lib.nix {
+    inherit pkgs lib;
+    inherit (config.clawde) multiplexer;
+  };
 
   agentResolution = import ./agent-resolution {
     inherit
@@ -82,7 +85,7 @@ let
     inherit (runtimeLocations) agentInstructionsFile agentLaunchConfigFile sidecarProcessLogFile;
   };
   inherit (agentWindowSpecHelpers)
-    buildAllSpecificationsForOneAgent
+    buildSpecificationForOneAgent
     buildAgentInstructionsContentByName
     buildAgentLaunchConfigByName
     ;
@@ -94,7 +97,7 @@ let
 
   buildSessionSpecification = sessionName: {
     name = sessionName;
-    agents = lib.concatMap buildAllSpecificationsForOneAgent (agentNamesInTmuxSession sessionName);
+    agents = map buildSpecificationForOneAgent (agentNamesInTmuxSession sessionName);
   };
 
   clawdeServiceSpecification = {
