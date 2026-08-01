@@ -120,11 +120,11 @@ in
           ...
         }:
         let
-          inherit (cfg.harnesses.codex) binaryName;
+          inherit (cfg.harnesses.codex) binaryInvocation;
           codexHomeAssignment = "CODEX_HOME=${lib.escapeShellArg (codexHomeDirectory name)}";
           developerInstructionsFlag = "-c developer_instructions=\"$(cat ${instructionsFile})\"";
         in
-        "${unshadowedBinaryPathAssignment} ${codexHomeAssignment} ${binaryName} ${sessionArgvShellExpansion} --no-alt-screen --dangerously-bypass-hook-trust ${developerInstructionsFlag}";
+        "${unshadowedBinaryPathAssignment} ${codexHomeAssignment} ${binaryInvocation} ${sessionArgvShellExpansion} --no-alt-screen --dangerously-bypass-hook-trust ${developerInstructionsFlag}";
 
       buildRunOnceCommandFor =
         {
@@ -134,11 +134,11 @@ in
           ...
         }:
         let
-          inherit (cfg.harnesses.codex) binaryName;
+          inherit (cfg.harnesses.codex) binaryInvocation;
           codexHomeAssignment = "CODEX_HOME=${lib.escapeShellArg (codexHomeDirectory name)}";
           developerInstructionsFlag = "-c developer_instructions=\"$(cat ${instructionsFile})\"";
         in
-        "${unshadowedBinaryPathAssignment} ${codexHomeAssignment} ${binaryName} exec --dangerously-bypass-approvals-and-sandbox ${developerInstructionsFlag} ${lib.escapeShellArg agent.heartbeatPrompt}";
+        "${unshadowedBinaryPathAssignment} ${codexHomeAssignment} ${binaryInvocation} exec --dangerously-bypass-approvals-and-sandbox ${developerInstructionsFlag} ${lib.escapeShellArg agent.heartbeatPrompt}";
 
       buildOneShotTurnCommandFor =
         {
@@ -147,12 +147,12 @@ in
           ...
         }:
         let
-          inherit (cfg.harnesses.codex) binaryName;
+          inherit (cfg.harnesses.codex) binaryInvocation;
           codexHomeAssignment = "CODEX_HOME=${lib.escapeShellArg (channelBridgeHomeDirectory name)}";
           developerInstructionsFlag = "-c developer_instructions=\"$(cat ${instructionsFile})\"";
           resumeSubcommand = "\${CLAWDE_CHANNEL_SESSION_CONTINUATION:+resume --last}";
         in
-        "${unshadowedBinaryPathAssignment} ${codexHomeAssignment} ${binaryName} exec ${resumeSubcommand} --dangerously-bypass-approvals-and-sandbox --output-last-message \"$CLAWDE_CHANNEL_REPLY_FILE\" ${developerInstructionsFlag} \"$CLAWDE_CHANNEL_PROMPT\"";
+        "${unshadowedBinaryPathAssignment} ${codexHomeAssignment} ${binaryInvocation} exec ${resumeSubcommand} --dangerously-bypass-approvals-and-sandbox --output-last-message \"$CLAWDE_CHANNEL_REPLY_FILE\" ${developerInstructionsFlag} \"$CLAWDE_CHANNEL_PROMPT\"";
 
       workspaceFilesFor =
         {
