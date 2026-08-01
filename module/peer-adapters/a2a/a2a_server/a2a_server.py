@@ -40,3 +40,4 @@ def run_a2a_server_blocking(
     finally:
         active_task_coordinator.stop_background_observation()
         agent_backend.stop()
+        http_server.server_close()
