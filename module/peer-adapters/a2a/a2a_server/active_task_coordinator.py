@@ -85,11 +85,21 @@ class ActiveTaskCoordinator:
             )
             return
         if self._reported_agent_status_says_the_turn_is_over(observation):
-            self._task_store.transition_task_state(active_task_id, "completed")
+            self._complete_after_collecting_whatever_settled_last(active_task_id)
             return
         idle_for_seconds = time.time() - observation.last_activity_at_epoch_seconds
         if idle_for_seconds >= self._auto_complete_idle_timeout_seconds:
-            self._task_store.transition_task_state(active_task_id, "completed")
+            self._complete_after_collecting_whatever_settled_last(active_task_id)
+
+    def _complete_after_collecting_whatever_settled_last(
+        self, active_task_id: str
+    ) -> None:
+        final_observation = self._agent_backend.observe()
+        if final_observation.raw_output_since_last_call:
+            self._task_store.append_task_output(
+                active_task_id, final_observation.raw_output_since_last_call
+            )
+        self._task_store.transition_task_state(active_task_id, "completed")
 
     def _reported_agent_status_says_the_turn_is_over(
         self, observation: BackendObservation

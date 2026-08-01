@@ -20,14 +20,26 @@ class TestObserveReportsNewMeaningfulLines:
         backend = attached_backend(fleet, monkeypatch, re.compile(r"^⏺ "))
         assert backend.observe().raw_output_since_last_call == ""
 
-    def test_reports_only_the_lines_that_appeared_since_the_previous_capture(
+    def test_reports_a_new_line_once_it_is_still_there_a_capture_later(
         self, monkeypatch
     ):
         fleet = FakeHerdrFleet().with_agent_pane("w1:p9", tab_label="jenny")
         fleet.showing("⏺ first response\n")
         backend = attached_backend(fleet, monkeypatch, re.compile(r"^⏺ "))
         fleet.showing("⏺ first response\n⏺ second response\n")
+        assert backend.observe().raw_output_since_last_call == ""
         assert backend.observe().raw_output_since_last_call == "⏺ second response"
+
+    def test_never_reports_a_line_the_pane_redrew_away_before_the_next_capture(
+        self, monkeypatch
+    ):
+        fleet = FakeHerdrFleet().with_agent_pane("w1:p9", tab_label="jenny")
+        fleet.showing("")
+        backend = attached_backend(fleet, monkeypatch, re.compile(r"^⏺ "))
+        fleet.showing("⏺ Listing 1 directory · 4m 19s…\n")
+        backend.observe()
+        fleet.showing("⏺ Listing 1 directory · 4m 21s…\n")
+        assert backend.observe().raw_output_since_last_call == ""
 
     def test_ignores_status_line_noise_that_changes_between_captures(self, monkeypatch):
         fleet = FakeHerdrFleet().with_agent_pane("w1:p9", tab_label="jenny")

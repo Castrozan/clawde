@@ -2,102 +2,89 @@ import re
 
 from a2a_server.backends.meaningful_line_tracking import MeaningfulLineTracker
 
-
-class TestOccurrenceKeysInCaptureOrder:
-    def test_yields_one_key_per_non_empty_line_with_occurrence_index_zero_when_unique(
-        self,
-    ):
-        tracker = MeaningfulLineTracker(meaningful_line_pattern=None)
-        capture = "first line\nsecond line\nthird line\n"
-        yielded = list(tracker.occurrence_keys_in_capture_order(capture))
-        assert yielded == [("first line", 0), ("second line", 0), ("third line", 0)]
-
-    def test_skips_blank_and_whitespace_only_lines(self):
-        tracker = MeaningfulLineTracker(meaningful_line_pattern=None)
-        capture = "alpha\n\n   \nbeta\n\t\ngamma\n"
-        yielded = list(tracker.occurrence_keys_in_capture_order(capture))
-        assert yielded == [("alpha", 0), ("beta", 0), ("gamma", 0)]
-
-    def test_assigns_incrementing_occurrence_indices_to_repeated_lines(self):
-        tracker = MeaningfulLineTracker(meaningful_line_pattern=None)
-        capture = "same line\nsame line\n  same line  \nunique line\n"
-        yielded = list(tracker.occurrence_keys_in_capture_order(capture))
-        assert yielded == [
-            ("same line", 0),
-            ("same line", 1),
-            ("same line", 2),
-            ("unique line", 0),
-        ]
-
-    def test_includes_only_lines_matching_meaningful_pattern_when_set(self):
-        tracker = MeaningfulLineTracker(meaningful_line_pattern=re.compile(r"^⏺ "))
-        capture = (
-            "❯ user prompt\n⏺ assistant response one\n"
-            "  Haiku 4.5 │ ctx 21% │ lim 19% 3h17m\n"
-            "⏺ assistant response two\n✻ Cogitated for 6s\n"
-        )
-        yielded = list(tracker.occurrence_keys_in_capture_order(capture))
-        assert yielded == [
-            ("⏺ assistant response one", 0),
-            ("⏺ assistant response two", 0),
-        ]
-
-    def test_pattern_matching_uses_normalized_stripped_form(self):
-        tracker = MeaningfulLineTracker(meaningful_line_pattern=re.compile(r"^⏺ "))
-        capture = "    ⏺ leading whitespace response\n"
-        yielded = list(tracker.occurrence_keys_in_capture_order(capture))
-        assert yielded == [("⏺ leading whitespace response", 0)]
-
-    def test_returns_empty_for_empty_capture(self):
-        tracker = MeaningfulLineTracker(meaningful_line_pattern=None)
-        assert list(tracker.occurrence_keys_in_capture_order("")) == []
-
-    def test_assigns_independent_occurrence_counters_per_line_value(self):
-        tracker = MeaningfulLineTracker(meaningful_line_pattern=None)
-        capture = "alpha\nbeta\nalpha\ngamma\nbeta\ndelta\n"
-        yielded = list(tracker.occurrence_keys_in_capture_order(capture))
-        assert yielded == [
-            ("alpha", 0),
-            ("beta", 0),
-            ("alpha", 1),
-            ("gamma", 0),
-            ("beta", 1),
-            ("delta", 0),
-        ]
+CLAUDE_RESPONSE_MARKER = re.compile(r"^⏺ ")
 
 
-class TestLinesAppearingSinceThePreviousCapture:
-    def test_reports_every_line_when_nothing_has_been_observed_yet(self):
-        tracker = MeaningfulLineTracker(meaningful_line_pattern=None)
-        assert tracker.lines_appearing_since_the_previous_capture("alpha\nbeta\n") == [
-            "alpha",
-            "beta",
-        ]
+def tracker_baselined_on(capture_text: str, pattern=CLAUDE_RESPONSE_MARKER):
+    tracker = MeaningfulLineTracker(pattern)
+    tracker.adopt_capture_as_baseline(capture_text)
+    return tracker
 
-    def test_reports_nothing_for_a_capture_adopted_as_the_baseline(self):
-        tracker = MeaningfulLineTracker(meaningful_line_pattern=None)
-        tracker.adopt_capture_as_baseline("alpha\nbeta\n")
-        assert tracker.lines_appearing_since_the_previous_capture("alpha\nbeta\n") == []
 
-    def test_reports_only_the_lines_added_since_the_previous_capture(self):
-        tracker = MeaningfulLineTracker(meaningful_line_pattern=None)
-        tracker.adopt_capture_as_baseline("alpha\n")
-        assert tracker.lines_appearing_since_the_previous_capture(
-            "alpha\nbeta\ngamma\n"
-        ) == ["beta", "gamma"]
+def settled(tracker, capture_text: str) -> list[str]:
+    return tracker.difference_since_the_previous_capture(capture_text).settled_lines
 
-    def test_reports_a_repeated_line_again_because_occurrences_are_counted(self):
-        tracker = MeaningfulLineTracker(meaningful_line_pattern=None)
-        tracker.adopt_capture_as_baseline("same\n")
-        assert tracker.lines_appearing_since_the_previous_capture("same\nsame\n") == [
-            "same"
-        ]
 
-    def test_reports_every_line_again_after_forgetting_what_was_observed(self):
-        tracker = MeaningfulLineTracker(meaningful_line_pattern=None)
-        tracker.adopt_capture_as_baseline("alpha\nbeta\n")
+def produced_something(tracker, capture_text: str) -> bool:
+    return tracker.difference_since_the_previous_capture(
+        capture_text
+    ).the_pane_produced_something_new
+
+
+class TestALineIsOutputOnlyOnceItStopsChanging:
+    def test_a_line_still_on_screen_one_capture_later_is_reported(self):
+        tracker = tracker_baselined_on("")
+        assert settled(tracker, "⏺ the answer\n") == []
+        assert settled(tracker, "⏺ the answer\n") == ["⏺ the answer"]
+
+    def test_a_line_replaced_before_the_next_capture_is_never_reported(self):
+        tracker = tracker_baselined_on("")
+        settled(tracker, "⏺ Listing 1 directory · 4m 19s…\n")
+        assert settled(tracker, "⏺ Listing 1 directory · 4m 21s…\n") == []
+
+    def test_a_spinner_never_leaks_into_the_answer_it_precedes(self):
+        tracker = tracker_baselined_on("")
+        for elapsed in ["4m 19s", "4m 21s", "4m 29s"]:
+            settled(tracker, f"⏺ Listing 1 directory · {elapsed}…\n")
+        settled(tracker, "⏺ Listing 1 directory · 4m 29s…\n⏺ LIVE-OK\n")
+        assert settled(tracker, "⏺ LIVE-OK\n") == ["⏺ LIVE-OK"]
+
+    def test_a_settled_line_is_reported_once_and_never_again(self):
+        tracker = tracker_baselined_on("")
+        settled(tracker, "⏺ the answer\n")
+        assert settled(tracker, "⏺ the answer\n") == ["⏺ the answer"]
+        assert settled(tracker, "⏺ the answer\n") == []
+
+    def test_settled_lines_come_back_in_the_order_the_pane_shows_them(self):
+        tracker = tracker_baselined_on("")
+        settled(tracker, "⏺ first\n⏺ second\n")
+        assert settled(tracker, "⏺ first\n⏺ second\n") == ["⏺ first", "⏺ second"]
+
+    def test_a_repeated_line_is_reported_once_per_occurrence(self):
+        tracker = tracker_baselined_on("")
+        settled(tracker, "⏺ same\n⏺ same\n")
+        assert settled(tracker, "⏺ same\n⏺ same\n") == ["⏺ same", "⏺ same"]
+
+
+class TestTheActivityClockFollowsAnyChangeNotJustSettledOutput:
+    def test_a_spinner_tick_counts_as_the_pane_being_alive(self):
+        tracker = tracker_baselined_on("")
+        assert produced_something(tracker, "⏺ Listing · 4m 19s…\n") is True
+        assert produced_something(tracker, "⏺ Listing · 4m 21s…\n") is True
+
+    def test_an_unchanged_pane_counts_as_quiet(self):
+        tracker = tracker_baselined_on("⏺ the answer\n")
+        assert produced_something(tracker, "⏺ the answer\n") is False
+
+
+class TestWhatCountsAsAMeaningfulLineAtAll:
+    def test_the_baseline_is_never_reported_as_output(self):
+        tracker = tracker_baselined_on("⏺ said before the task started\n")
+        assert settled(tracker, "⏺ said before the task started\n") == []
+
+    def test_lines_that_do_not_match_the_pattern_are_ignored_entirely(self):
+        tracker = tracker_baselined_on("")
+        settled(tracker, "  ctx 21% | lim 19% 3h17m\n")
+        assert settled(tracker, "  ctx 24% | lim 20% 3h11m\n") == []
+
+    def test_with_no_pattern_every_non_empty_line_is_meaningful(self):
+        tracker = tracker_baselined_on("", pattern=None)
+        settled(tracker, "a plain line\n")
+        assert settled(tracker, "a plain line\n") == ["a plain line"]
+
+    def test_forgetting_makes_the_next_capture_a_fresh_baseline(self):
+        tracker = tracker_baselined_on("")
+        settled(tracker, "⏺ the answer\n")
         tracker.forget_everything_observed_so_far()
-        assert tracker.lines_appearing_since_the_previous_capture("alpha\nbeta\n") == [
-            "alpha",
-            "beta",
-        ]
+        settled(tracker, "⏺ the answer\n")
+        assert settled(tracker, "⏺ the answer\n") == ["⏺ the answer"]

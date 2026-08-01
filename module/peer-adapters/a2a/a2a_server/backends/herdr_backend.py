@@ -48,15 +48,15 @@ class HerdrAttachedAgentBackend(AgentBackend):
                 is_alive=False,
                 last_activity_at_epoch_seconds=self._last_activity_at_epoch_seconds,
             )
-        new_lines_in_capture_order = (
-            self._meaningful_line_tracker.lines_appearing_since_the_previous_capture(
+        capture_difference = (
+            self._meaningful_line_tracker.difference_since_the_previous_capture(
                 self._capture_agent_pane_text()
             )
         )
-        if new_lines_in_capture_order:
+        if capture_difference.the_pane_produced_something_new:
             self._last_activity_at_epoch_seconds = time.time()
         return BackendObservation(
-            raw_output_since_last_call="\n".join(new_lines_in_capture_order),
+            raw_output_since_last_call="\n".join(capture_difference.settled_lines),
             is_alive=pane_information.get("agent") is not None,
             last_activity_at_epoch_seconds=self._last_activity_at_epoch_seconds,
             agent_is_busy=agent_status_means_the_agent_is_busy(
