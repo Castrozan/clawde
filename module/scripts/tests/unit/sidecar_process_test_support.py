@@ -15,6 +15,14 @@ def make_sidecar_specification(tmp_path, command="true"):
     }
 
 
+def make_sidecar_specification_with_lifetime(tmp_path, lifetime, enabled=True):
+    return {
+        **make_sidecar_specification(tmp_path),
+        "enabled": enabled,
+        "lifetime": lifetime,
+    }
+
+
 def make_session_specification(tmp_path):
     return {
         "name": "clawde",
