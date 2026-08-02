@@ -65,11 +65,17 @@ clawde stop my-agent
 clawde list
 ```
 
+`clawde` with no arguments starts the supervised agents session, and
+`clawde --help`, `clawde -h`, or `clawde help` prints the top-level usage
+naming every command and its purpose. Running it with a command it does not
+know fails without touching the supervisor, the multiplexer, or the platform
+service manager.
+
 The module installs a bash completion at
 `$XDG_DATA_HOME/bash-completion/completions/clawde`, which bash-completion's dynamic
-loader searches first, so the subcommands complete, `start`/`stop` offer only the agents
-declared `onDemand`, and `active` offers only the agents that actually have an
-active-hours gate. It goes to the user data directory rather than the package's `share`
+loader searches first, so the subcommands and the help forms complete,
+`start`/`stop` offer only the agents declared `onDemand`, and `active` offers
+only the agents that actually have an active-hours gate. It goes to the user data directory rather than the package's `share`
 because nix-darwin's per-user profile does not link `share/bash-completion` onto
 `XDG_DATA_DIRS`.
 

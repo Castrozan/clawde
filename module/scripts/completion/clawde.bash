@@ -44,7 +44,7 @@ _clawde() {
 	subcommand="${COMP_WORDS[1]:-}"
 
 	if [ "$COMP_CWORD" -eq 1 ]; then
-		mapfile -t COMPREPLY < <(compgen -W "active harness list start stop" -- "$current_word")
+		mapfile -t COMPREPLY < <(compgen -W "active harness help list start stop --help -h" -- "$current_word")
 		return 0
 	fi
 
