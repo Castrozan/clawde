@@ -6,8 +6,15 @@
 }:
 let
   cfg = config.clawde;
+  homeDir = config.home.homeDirectory;
+  runtimeLocations = import ../../lib/runtime-locations.nix { inherit homeDir; };
+
   agentsOnClaude = lib.filterAttrs (_: agent: agent.harness == "claude") cfg.agents;
   hasClaudeAgents = agentsOnClaude != { };
+
+  unshadowedBinaryDirectoryRelativeToHome = "${runtimeLocations.runtimeRootRelativeToHome}/harness-home/claude/bin";
+  unshadowedBinaryDirectory = "${homeDir}/${unshadowedBinaryDirectoryRelativeToHome}";
+  unshadowedBinaryPathAssignment = "PATH=${lib.escapeShellArg unshadowedBinaryDirectory}:\"$PATH\"";
 
   seedClaudeWorkspaceScript = pkgs.writeShellScript "seed-one-workspace-claude" (
     builtins.readFile ./scripts/seed-claude-workspace.sh
@@ -106,7 +113,7 @@ in
           appendSystemPromptFlag = "--append-system-prompt \"$(cat ${instructionsFile})\"";
           mcpConfigFlags = agentScopedMcpConfigFlagsFor name agent;
         in
-        "${binaryInvocation} ${sessionArgvShellExpansion} ${channelLaunchFlags} ${modelFlag} ${nameFlag} ${permissionModeFlag} ${mcpConfigFlags}${appendSystemPromptFlag} ${skillDirectoryFlags}";
+        "${unshadowedBinaryPathAssignment} ${binaryInvocation} ${sessionArgvShellExpansion} ${channelLaunchFlags} ${modelFlag} ${nameFlag} ${permissionModeFlag} ${mcpConfigFlags}${appendSystemPromptFlag} ${skillDirectoryFlags}";
 
       buildRunOnceCommandFor =
         {
@@ -127,7 +134,7 @@ in
           appendSystemPromptFlag = "--append-system-prompt \"$(cat ${instructionsFile})\"";
           mcpConfigFlags = agentScopedMcpConfigFlagsFor name agent;
         in
-        "${binaryInvocation} ${runOncePrintFlag} \${CLAWDE_SESSION_ARGV:-} ${modelFlag} ${nameFlag} ${permissionModeFlag} ${mcpConfigFlags}${appendSystemPromptFlag} ${skillDirectoryFlags}";
+        "${unshadowedBinaryPathAssignment} ${binaryInvocation} ${runOncePrintFlag} \${CLAWDE_SESSION_ARGV:-} ${modelFlag} ${nameFlag} ${permissionModeFlag} ${mcpConfigFlags}${appendSystemPromptFlag} ${skillDirectoryFlags}";
 
       workspaceFilesFor =
         {
@@ -149,6 +156,11 @@ in
       agentActivationScriptFor =
         { workspaceDirectory, harnessBinary, ... }:
         "${seedClaudeWorkspaceScript} ${lib.escapeShellArg workspaceDirectory} ${lib.escapeShellArg harnessBinary}";
+    };
+
+    home.file = lib.optionalAttrs (hasClaudeAgents && cfg.harnesses.claude.package != null) {
+      "${unshadowedBinaryDirectoryRelativeToHome}/${cfg.harnesses.claude.binaryName}".source =
+        "${cfg.harnesses.claude.package}/bin/${cfg.harnesses.claude.binaryName}";
     };
 
     assertions = lib.optionals hasClaudeAgents [
