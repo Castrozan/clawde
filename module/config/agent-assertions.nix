@@ -37,6 +37,13 @@ in
                 builtins.filter (
                   param: (agent.typeParams.${agent.type}.${param} or null) == null
                 ) typeDefinition.requiredParams;
+            discordTransportResolution =
+              if agent.channel.type == "discord" then
+                (import ../lib/discord-transport.nix { inherit lib; }).resolve
+                  effectiveAgent.channel.discord.transport
+                  harnessDefinition
+              else
+                null;
           in
           [
             {
@@ -74,6 +81,14 @@ in
               message = "Agent ${name}: harness '${agent.harness}' cannot transport channel.type '${agent.channel.type}'; it serves ${
                 lib.concatStringsSep ", " (harnessDefinition.supportedChannelTypes or [ ])
               }. Move the agent to a harness that carries this channel, or drop the channel.";
+            }
+            {
+              assertion = discordTransportResolution == null || discordTransportResolution.satisfiable;
+              message = "Agent ${name}: channel.discord.transport = '${effectiveAgent.channel.discord.transport}' is not satisfiable on harness '${agent.harness}'. The harness embeds discord for ${
+                lib.concatStringsSep ", " (harnessDefinition.embeddedChannelTypes or [ ])
+              } and its headless one-shot turn command is ${
+                if harnessDefinition.buildOneShotTurnCommandFor == null then "absent" else "present"
+              }; set the transport to a value the harness can serve, or move the agent to another harness.";
             }
             {
               assertion = unenforceableDenyToolPatterns == [ ];

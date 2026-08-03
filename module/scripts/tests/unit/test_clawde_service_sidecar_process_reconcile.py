@@ -171,9 +171,7 @@ def test_a_service_lifetime_sidecar_spawns_while_its_agent_is_dormant(
     ]
 
 
-def test_a_service_lifetime_sidecar_survives_its_agents_dormancy(
-    tmp_path, monkeypatch
-):
+def test_a_service_lifetime_sidecar_survives_its_agents_dormancy(tmp_path, monkeypatch):
     spawned_specifications, terminated_process_ids = record_process_lookups(
         monkeypatch, [4321]
     )

@@ -46,7 +46,7 @@ rec {
     let
       adapter = getChannelAdapterFor agent;
     in
-    if adapter != null then adapter.instructions else "";
+    if adapter != null then adapter.instructionsFor agent else "";
 
   resolveChannelAdapterLaunchFlag =
     agent:
