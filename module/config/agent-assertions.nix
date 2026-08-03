@@ -59,8 +59,14 @@ in
               message = "Agent ${name}: channel.type must be one of ${lib.concatStringsSep ", " knownChannelTypes} (got '${agent.channel.type}').";
             }
             {
-              assertion = !(agent.mcpServers != null && agent.channel.type != "none");
-              message = "Agent ${name}: mcpServers is incompatible with a channel adapter (channel.type = '${agent.channel.type}'). An agent-scoped MCP set launches the harness in strict MCP mode, so it loads only the servers named there and excludes the channel plugin's own MCP server, which makes the channel (e.g. discord) silently fail to connect. Drop mcpServers on channel agents and scope their tools with denyToolPatterns instead.";
+              assertion =
+                !(
+                  agent.mcpServers != null
+                  && agent.channel.type == "discord"
+                  && discordTransportResolution != null
+                  && discordTransportResolution.transport == "embedded"
+                );
+              message = "Agent ${name}: mcpServers is incompatible with an embedded discord channel, because channel.discord.transport resolved to 'embedded' for harness '${agent.harness}'. An agent-scoped MCP set launches the harness in strict MCP mode, so it loads only the servers named there and excludes the discord plugin's own MCP server, which makes the channel silently fail to connect. Drop mcpServers on embedded channel agents and scope their tools with denyToolPatterns instead, or set channel.discord.transport = 'sidecar' so the bridge carries the channel and the harness can run strict MCP.";
             }
             {
               assertion = builtins.elem agent.type knownAgentTypes;

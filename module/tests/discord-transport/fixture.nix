@@ -70,6 +70,7 @@ let
       transport,
       lifetime,
       dailySessionRotation ? false,
+      mcpServers ? null,
     }:
     {
       type = "generic";
@@ -82,6 +83,7 @@ let
         sidecarLifetime = lifetime;
         botTokenSecretName = "fixture-discord-token";
       };
+      inherit mcpServers;
     };
 
   evaluatedFor =
@@ -107,6 +109,7 @@ let
         module
         {
           clawde = {
+            multiplexer = "herdr";
             agents.fixture-agent = agentConfig;
             harnesses = {
               claude.package = pkgs.hello;
@@ -210,6 +213,24 @@ let
     lifetime = "agent";
   });
 
+  claudeEmbeddedWithMcpEvaluated = evaluatedFor (discordAgentConfig {
+    harness = "claude";
+    transport = "embedded";
+    lifetime = "agent";
+    mcpServers = {
+      fixture-server = { };
+    };
+  });
+
+  claudeSidecarWithMcpEvaluated = evaluatedFor (discordAgentConfig {
+    harness = "claude";
+    transport = "sidecar";
+    lifetime = "agent";
+    mcpServers = {
+      fixture-server = { };
+    };
+  });
+
   claudeAutoSidecarProcess = builtins.head (sidecarProcessesFor claudeAutoEvaluated);
   claudeSidecarProcess = builtins.head (sidecarProcessesFor claudeSidecarEvaluated);
   claudeSidecarServiceLifetimeProcess = builtins.head (
@@ -242,6 +263,12 @@ let
   transportAssertion =
     name: expected: selected: harness:
     assertion name expected (resolvedTransportFor selected harness);
+
+  failedAssertionMessagesFor =
+    evaluated:
+    map (assertionEntry: assertionEntry.message) (
+      lib.filter (assertionEntry: !assertionEntry.assertion) evaluated.config.assertions
+    );
 in
 {
   inherit
@@ -249,6 +276,8 @@ in
     claudeSidecarEvaluated
     claudeSidecarServiceLifetimeEvaluated
     codexSidecarEvaluated
+    claudeEmbeddedWithMcpEvaluated
+    claudeSidecarWithMcpEvaluated
     ;
 
   assertions = [
@@ -266,6 +295,16 @@ in
     ))
     (assertion "auto-on-passive-harness-unsatisfiable" "false" (
       stringify (transportResolution.resolve "auto" fakePassiveHarness).satisfiable
+    ))
+    (assertion "embedded-strict-mcp-rejected" "true" (
+      stringify (
+        lib.any (message: builtins.match ".*mcpServers.*" message != null) (
+          failedAssertionMessagesFor claudeEmbeddedWithMcpEvaluated
+        )
+      )
+    ))
+    (assertion "sidecar-strict-mcp-permitted" "true" (
+      stringify ((failedAssertionMessagesFor claudeSidecarWithMcpEvaluated) == [ ])
     ))
     (assertion "auto-claude-sidecar-enabled" "false" (stringify claudeAutoSidecarProcess.enabled))
     (assertion "auto-claude-sidecar-lifetime" "agent" claudeAutoSidecarProcess.lifetime)
