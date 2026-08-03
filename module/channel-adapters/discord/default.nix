@@ -9,9 +9,14 @@ let
   homeDir = config.home.homeDirectory;
   secretsDirectory = "${homeDir}/.secrets";
   agentsUsingDiscord = lib.filterAttrs (_: agent: agent.channel.type == "discord") cfg.agents;
-  hasDiscordAgents = agentsUsingDiscord != { };
+  hasEmbeddedDiscordAgents = lib.any (
+    name: discordTransportForAgent cfg.agents.${name} == "embedded"
+  ) (builtins.attrNames agentsUsingDiscord);
+
+  discordTransportResolution = import ../../lib/discord-transport.nix { inherit lib; };
 
   discordAdapterInstructions = builtins.readFile ./instructions/discord-runtime.md;
+  discordSidecarAdapterInstructions = builtins.readFile ./instructions/discord-runtime-sidecar.md;
 
   updateClaudePluginsMarketplace = pkgs.writeShellScript "update-claude-plugins-marketplace" ''
     export MARKETPLACE_DIR=${lib.escapeShellArg "${homeDir}/.claude/plugins/marketplaces/claude-plugins-official"}
@@ -47,6 +52,12 @@ let
   discordBridgeProcessMatchPatternFor =
     name: "bridge.py ${discordBridgeIdentifyingArgumentsFor name}";
 
+  discordTransportForAgent =
+    agent:
+    (discordTransportResolution.resolve agent.channel.discord.transport (
+      config.clawde.harnesses.${agent.harness} or null
+    )).transport;
+
   discordBridgeCommandFor =
     {
       name,
@@ -59,10 +70,12 @@ let
       hasToken = agent.channel.discord.botTokenSecretName != null;
       waitForTokenPrefix = lib.optionalString hasToken "${waitForSecretScript} ${tokenFile} && ";
       tokenAssignment = lib.optionalString hasToken "DISCORD_BOT_TOKEN=$(cat ${tokenFile}) ";
+      rotationFlag = lib.optionalString agent.dailySessionRotation "--daily-session-rotation";
       bridgeArguments = lib.concatStringsSep " " [
         "${./scripts/bridge.py} ${discordBridgeIdentifyingArgumentsFor name} ${lib.escapeShellArg oneShotTurnCommand}"
         "--workspace-directory ${lib.escapeShellArg workspaceDirectory}"
         "--state-directory ${lib.escapeShellArg (discordChannelEnvDirectoryFor name)}"
+        rotationFlag
       ];
     in
     "${waitForTokenPrefix}${tokenAssignment}PYTHONPATH=${./scripts} exec ${bridgePythonEnvironment}/bin/python3 ${bridgeArguments}";
@@ -73,15 +86,34 @@ in
       lib.types.submodule {
         options.channel.discord = lib.mkOption {
           type = lib.types.submodule {
-            options.botTokenSecretName = lib.mkOption {
-              type = lib.types.nullOr lib.types.str;
-              default = null;
-              description = "Name of the decrypted secret file in ~/.secrets/ that holds the Discord bot token.";
-            };
-            options.allowedChannelsSecretName = lib.mkOption {
-              type = lib.types.nullOr lib.types.str;
-              default = null;
-              description = "Name of the decrypted secret file in ~/.secrets/ holding the Discord channel snowflakes this agent is allowed to respond in, merged into the agent's own access.json under groups.";
+            options = {
+              botTokenSecretName = lib.mkOption {
+                type = lib.types.nullOr lib.types.str;
+                default = null;
+                description = "Name of the decrypted secret file in ~/.secrets/ that holds the Discord bot token.";
+              };
+              allowedChannelsSecretName = lib.mkOption {
+                type = lib.types.nullOr lib.types.str;
+                default = null;
+                description = "Name of the decrypted secret file in ~/.secrets/ holding the Discord channel snowflakes this agent is allowed to respond in, merged into the agent's own access.json under groups.";
+              };
+              transport = lib.mkOption {
+                type = lib.types.enum [
+                  "auto"
+                  "embedded"
+                  "sidecar"
+                ];
+                default = "auto";
+                description = "How the Discord channel is carried for this agent. 'auto' embeds when the harness serves discord in-process (claude plugin) and bridges through the sidecar one-shot turn otherwise (codex, opencode). 'embedded' forces the in-process plugin and 'sidecar' forces the bridge; forcing a transport the harness cannot provide fails a build-time assertion. Exactly one Discord client exists per bot token: a sidecar agent never also launches the plugin.";
+              };
+              sidecarLifetime = lib.mkOption {
+                type = lib.types.enum [
+                  "agent"
+                  "service"
+                ];
+                default = "agent";
+                description = "How long the sidecar bridge stays supervised. 'agent' follows the agent's own run decision: it stops whenever onDemand, launch gates, active hours, or idle teardown keep the wrapper absent. 'service' keeps the bridge connected whenever the agent is declared, so the agent can be woken per message even while its window is dormant.";
+              };
             };
           };
           default = { };
@@ -94,30 +126,51 @@ in
   config = {
     clawde.channelAdapters.discord = {
       instructions = discordAdapterInstructions;
-      launchFlags = _: "--channels plugin:discord@claude-plugins-official";
+
+      instructionsFor =
+        agent:
+        if discordTransportForAgent agent == "sidecar" then
+          discordSidecarAdapterInstructions
+        else
+          discordAdapterInstructions;
+
+      launchFlags =
+        agent:
+        lib.optionalString (
+          discordTransportForAgent agent == "embedded"
+        ) "--channels plugin:discord@claude-plugins-official";
+
       environmentSetterFor =
         { name, agent }:
-        let
-          stateDirectoryAssignment = "DISCORD_STATE_DIR=${lib.escapeShellArg (discordChannelEnvDirectoryFor name)} ";
-          tokenFile = lib.escapeShellArg "${secretsDirectory}/${toString agent.channel.discord.botTokenSecretName}";
-          hasToken = agent.channel.discord.botTokenSecretName != null;
-          waitForTokenPrefix = lib.optionalString hasToken "${waitForSecretScript} ${tokenFile} && ";
-          tokenAssignment = lib.optionalString hasToken "DISCORD_BOT_TOKEN=$(cat ${tokenFile}) ";
-        in
-        "${waitForTokenPrefix}${stateDirectoryAssignment}${tokenAssignment}";
-      workspaceSettingsFor = _: {
-        hooks.Stop = [
+        lib.optionalString (discordTransportForAgent agent == "embedded") (
+          let
+            stateDirectoryAssignment = "DISCORD_STATE_DIR=${lib.escapeShellArg (discordChannelEnvDirectoryFor name)} ";
+            tokenFile = lib.escapeShellArg "${secretsDirectory}/${toString agent.channel.discord.botTokenSecretName}";
+            hasToken = agent.channel.discord.botTokenSecretName != null;
+            waitForTokenPrefix = lib.optionalString hasToken "${waitForSecretScript} ${tokenFile} && ";
+            tokenAssignment = lib.optionalString hasToken "DISCORD_BOT_TOKEN=$(cat ${tokenFile}) ";
+          in
+          "${waitForTokenPrefix}${stateDirectoryAssignment}${tokenAssignment}"
+        );
+
+      workspaceSettingsFor =
+        { agent, ... }:
+        if discordTransportForAgent agent == "embedded" then
           {
-            hooks = [
+            hooks.Stop = [
               {
-                type = "command";
-                command = "${enforceDiscordReplyStopHook}";
+                hooks = [
+                  {
+                    type = "command";
+                    command = "${enforceDiscordReplyStopHook}";
+                  }
+                ];
               }
             ];
+            enabledPlugins."discord@claude-plugins-official" = true;
           }
-        ];
-        enabledPlugins."discord@claude-plugins-official" = true;
-      };
+        else
+          { };
 
       sidecarProcessSpecificationsFor =
         {
@@ -138,6 +191,8 @@ in
                 ;
             };
             process_match_pattern = discordBridgeProcessMatchPatternFor name;
+            enabled = discordTransportForAgent agent == "sidecar";
+            lifetime = agent.channel.discord.sidecarLifetime;
           }
         ];
 
@@ -162,7 +217,7 @@ in
           ${secretInjectionLine}
           ${mergeChannelAccessLine}
         '';
-      preActivation = if hasDiscordAgents then "run ${updateClaudePluginsMarketplace}" else null;
+      preActivation = if hasEmbeddedDiscordAgents then "run ${updateClaudePluginsMarketplace}" else null;
     };
   };
 }

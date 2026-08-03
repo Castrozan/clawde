@@ -63,10 +63,25 @@ def reconcile_sidecar_processes_for_session(
     session_specification: dict, agent_names_that_should_be_running: set
 ) -> None:
     for agent_specification in session_specification["agents"]:
-        sidecar_should_be_running = (
-            agent_specification["name"] in agent_names_that_should_be_running
-        )
+        agent_name = agent_specification["name"]
         for sidecar_specification in agent_specification.get("sidecar_processes", []):
+            sidecar_should_be_running = sidecar_should_be_running_for(
+                agent_name,
+                sidecar_specification,
+                agent_names_that_should_be_running,
+            )
             reconcile_one_sidecar_process(
                 sidecar_specification, sidecar_should_be_running
             )
+
+
+def sidecar_should_be_running_for(
+    agent_name: str,
+    sidecar_specification: dict,
+    agent_names_that_should_be_running: set,
+) -> bool:
+    if not sidecar_specification.get("enabled", True):
+        return False
+    if sidecar_specification.get("lifetime", "agent") == "service":
+        return True
+    return agent_name in agent_names_that_should_be_running

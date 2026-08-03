@@ -68,6 +68,8 @@ in
         "discord"
       ];
 
+      embeddedChannelTypes = [ "none" ];
+
       inherit (denyToolPatternTranslation) unenforceableDenyToolPatternsFor;
 
       runtimeProfile = {

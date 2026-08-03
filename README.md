@@ -91,6 +91,42 @@ same conversation rather than making the operator find it. Set `dailySessionRota
 if a fresh session per day is wanted instead. `activeHoursStart`/`activeHoursEnd` still
 apply on top: an on-demand agent outside its active hours stays stopped despite a lease.
 
+### Message-driven Discord agents
+
+An agent that answers Discord messages without holding a warm harness process runs the
+bridge as an always-connected sidecar and lets the supervisor wake the harness for one
+headless turn per accepted message:
+
+```nix
+clawde.agents.silver = {
+  type = "project-manager";
+  onDemand = true;
+  channel.type = "discord";
+  channel.discord = {
+    transport = "sidecar";
+    sidecarLifetime = "service";
+    botTokenSecretName = "silver-discord-token";
+  };
+};
+```
+
+`channel.discord.transport = "sidecar"` forbids the embedded plugin, so the sidecar owns
+the bot token and each accepted message runs one headless harness turn (`claude --print`
+on the claude harness) that exits afterwards; one bot token never has two Discord
+clients. `sidecarLifetime = "service"` keeps the bridge connected whenever the agent is
+declared, so `onDemand = true` or an active-hours gate can keep the pane absent without
+dropping the channel. The bridge continues the agent's own channel conversation, kept
+separate from any manually started warm session, and `dailySessionRotation` also starts
+a fresh channel conversation whenever the local date crosses.
+
+While the pane is absent, A2A peers cannot reach the agent: pane-backed A2A serves live
+windows only and reports the agent unavailable rather than waking it. A later increment
+may wake an on-demand pane for A2A, but Discord delivery never depends on that pane.
+
+The default transport is `"auto"`: claude agents embed through the plugin, codex and
+opencode agents bridge through the sidecar, and `sidecarLifetime` defaults to `"agent"`,
+stopping the bridge whenever the wrapper is dormant.
+
 ## Outputs
 
 - `homeManagerModules.default` / `homeManagerModules.clawde` - the module.

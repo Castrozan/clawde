@@ -6,6 +6,7 @@
   outputs =
     { self, nixpkgs }:
     let
+      inherit (nixpkgs) lib;
       supportedSystems = [
         "x86_64-linux"
         "aarch64-linux"
@@ -26,6 +27,26 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           pythonForUnitTests = pkgs.python312.withPackages (pythonPackages: [ pythonPackages.pytest ]);
+          discordTransportFixture = import ./module/tests/discord-transport/fixture.nix {
+            inherit pkgs lib;
+            module = self.homeManagerModules.clawde;
+          };
+          checkAssertion =
+            assertion:
+            let
+              actual = lib.escapeShellArg assertion.actual;
+              expected = lib.escapeShellArg assertion.expected;
+            in
+            ''
+              actual=${actual}
+              expected=${expected}
+              if [ "$actual" != "$expected" ]; then
+                echo "FAIL ${assertion.name}"
+                echo "  expected: $expected"
+                echo "  actual:   $actual"
+                exit 1
+              fi
+            '';
         in
         {
           unit-tests =
@@ -48,6 +69,10 @@
                   module/peer-adapters/a2a/a2a_server/tests
                 touch "$out"
               '';
+
+          discord-transport-eval = pkgs.runCommand "clawde-discord-transport-eval" { } (
+            lib.concatStringsSep "\n" (map checkAssertion discordTransportFixture.assertions) + "\ntouch $out"
+          );
 
           formatting =
             pkgs.runCommand "clawde-formatting"

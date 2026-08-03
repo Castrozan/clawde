@@ -37,6 +37,13 @@ in
                 builtins.filter (
                   param: (agent.typeParams.${agent.type}.${param} or null) == null
                 ) typeDefinition.requiredParams;
+            discordTransportResolution =
+              if agent.channel.type == "discord" then
+                (import ../lib/discord-transport.nix { inherit lib; }).resolve
+                  effectiveAgent.channel.discord.transport
+                  harnessDefinition
+              else
+                null;
           in
           [
             {
@@ -52,8 +59,14 @@ in
               message = "Agent ${name}: channel.type must be one of ${lib.concatStringsSep ", " knownChannelTypes} (got '${agent.channel.type}').";
             }
             {
-              assertion = !(agent.mcpServers != null && agent.channel.type != "none");
-              message = "Agent ${name}: mcpServers is incompatible with a channel adapter (channel.type = '${agent.channel.type}'). An agent-scoped MCP set launches the harness in strict MCP mode, so it loads only the servers named there and excludes the channel plugin's own MCP server, which makes the channel (e.g. discord) silently fail to connect. Drop mcpServers on channel agents and scope their tools with denyToolPatterns instead.";
+              assertion =
+                !(
+                  agent.mcpServers != null
+                  && agent.channel.type == "discord"
+                  && discordTransportResolution != null
+                  && discordTransportResolution.transport == "embedded"
+                );
+              message = "Agent ${name}: mcpServers is incompatible with an embedded discord channel, because channel.discord.transport resolved to 'embedded' for harness '${agent.harness}'. An agent-scoped MCP set launches the harness in strict MCP mode, so it loads only the servers named there and excludes the discord plugin's own MCP server, which makes the channel silently fail to connect. Drop mcpServers on embedded channel agents and scope their tools with denyToolPatterns instead, or set channel.discord.transport = 'sidecar' so the bridge carries the channel and the harness can run strict MCP.";
             }
             {
               assertion = builtins.elem agent.type knownAgentTypes;
@@ -74,6 +87,14 @@ in
               message = "Agent ${name}: harness '${agent.harness}' cannot transport channel.type '${agent.channel.type}'; it serves ${
                 lib.concatStringsSep ", " (harnessDefinition.supportedChannelTypes or [ ])
               }. Move the agent to a harness that carries this channel, or drop the channel.";
+            }
+            {
+              assertion = discordTransportResolution == null || discordTransportResolution.satisfiable;
+              message = "Agent ${name}: channel.discord.transport = '${effectiveAgent.channel.discord.transport}' is not satisfiable on harness '${agent.harness}'. The harness embeds discord for ${
+                lib.concatStringsSep ", " (harnessDefinition.embeddedChannelTypes or [ ])
+              } and its headless one-shot turn command is ${
+                if harnessDefinition.buildOneShotTurnCommandFor == null then "absent" else "present"
+              }; set the transport to a value the harness can serve, or move the agent to another harness.";
             }
             {
               assertion = unenforceableDenyToolPatterns == [ ];

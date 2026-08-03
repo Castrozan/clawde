@@ -165,6 +165,11 @@ in
               default = [ "none" ];
               description = "channel.type values this harness can actually serve. An agent pairing a channel this harness cannot transport fails a build-time assertion rather than launching into a session that can never receive a message.";
             };
+            embeddedChannelTypes = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = [ "none" ];
+              description = "channel.type values this harness serves in-process (plugin, native channel support) with no sidecar bridge. The total supportedChannelTypes is the union of what embeds and what a one-shot turn command can bridge; channel adapters pick embedded transport when this list carries the channel and fall back to the sidecar bridge otherwise.";
+            };
             packages = lib.mkOption {
               type = lib.types.listOf lib.types.package;
               default = [ ];

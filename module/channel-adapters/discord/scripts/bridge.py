@@ -36,6 +36,7 @@ class AgentBridgeClient(discord.Client):
         one_shot_turn_command: str,
         workspace_directory: str,
         state_directory: str,
+        daily_session_rotation: bool,
         access_document_reader,
     ):
         intents = discord.Intents.default()
@@ -45,6 +46,7 @@ class AgentBridgeClient(discord.Client):
         self.one_shot_turn_command = one_shot_turn_command
         self.workspace_directory = workspace_directory
         self.state_directory = state_directory
+        self.daily_session_rotation = daily_session_rotation
         self.access_document_reader = access_document_reader
         self.turn_lock = asyncio.Lock()
 
@@ -69,6 +71,7 @@ class AgentBridgeClient(discord.Client):
                     self.workspace_directory,
                     self.state_directory,
                     message.clean_content,
+                    self.daily_session_rotation,
                 )
         if not reply:
             log(self.agent_name, f"turn produced no reply: {failure[:400]}")
@@ -92,6 +95,12 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--one-shot-turn-command", required=True)
     parser.add_argument("--workspace-directory", required=True)
     parser.add_argument("--state-directory", required=True)
+    parser.add_argument(
+        "--daily-session-rotation",
+        action="store_true",
+        help="Start the channel session fresh whenever the last completed turn is "
+        "from an earlier local date.",
+    )
     return parser.parse_args()
 
 
@@ -108,6 +117,7 @@ def main() -> None:
         arguments.one_shot_turn_command,
         arguments.workspace_directory,
         arguments.state_directory,
+        arguments.daily_session_rotation,
         lambda: load_access_document(arguments.state_directory),
     ).run(bot_token, log_handler=None)
 
