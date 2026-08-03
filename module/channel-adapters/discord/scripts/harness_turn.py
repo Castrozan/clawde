@@ -140,16 +140,20 @@ def run_one_turn(
         session_identifier = mint_fresh_channel_session_identifier(state_directory)
     with tempfile.TemporaryDirectory() as reply_directory:
         reply_file_path = os.path.join(reply_directory, "reply.txt")
-        completed_turn = subprocess.run(
-            ["bash", "-c", one_shot_turn_command],
-            cwd=workspace_directory,
-            env=build_turn_environment(
-                prompt, reply_file_path, resuming, session_identifier
-            ),
-            capture_output=True,
-            text=True,
-            timeout=TURN_TIMEOUT_SECONDS,
-        )
+        try:
+            completed_turn = subprocess.run(
+                ["bash", "-c", one_shot_turn_command],
+                cwd=workspace_directory,
+                env=build_turn_environment(
+                    prompt, reply_file_path, resuming, session_identifier
+                ),
+                capture_output=True,
+                text=True,
+                timeout=TURN_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            forget_the_channel_session(state_directory)
+            return "", f"one-shot turn exceeded {TURN_TIMEOUT_SECONDS} seconds"
         reply = read_reply_file(reply_file_path)
     if reply:
         remember_that_a_turn_completed(state_directory)

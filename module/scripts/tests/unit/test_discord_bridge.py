@@ -1,5 +1,6 @@
 import importlib.util
 import pathlib
+import subprocess
 import sys
 import types
 
@@ -147,6 +148,29 @@ def test_without_daily_rotation_a_stale_date_does_not_reset_the_session(tmp_path
     )
     continuation, _ = next_reply.split("|")
     assert continuation == "1"
+
+
+def test_a_timed_out_turn_clears_the_channel_session_and_reports_a_failure(
+    tmp_path, monkeypatch
+):
+    state_directory = str(tmp_path / "state")
+    command = 'printf "%s" "$CLAWDE_CHANNEL_SESSION_IDENTIFIER" > "$CLAWDE_CHANNEL_REPLY_FILE"'
+    harness_turn.run_one_turn(command, str(tmp_path), state_directory, "hello")
+    assert harness_turn.a_previous_turn_is_resumable(state_directory)
+
+    def raise_timeout(*_arguments, **_keyword_arguments):
+        raise subprocess.TimeoutExpired("bash", harness_turn.TURN_TIMEOUT_SECONDS)
+
+    monkeypatch.setattr(harness_turn.subprocess, "run", raise_timeout)
+
+    reply, failure = harness_turn.run_one_turn(
+        "true", str(tmp_path), state_directory, "again"
+    )
+
+    assert reply == ""
+    assert "900" in failure
+    assert not harness_turn.a_previous_turn_is_resumable(state_directory)
+    assert harness_turn.read_channel_session_identifier(state_directory) is None
 
 
 def load_bridge_module_with_stubbed_discord():
