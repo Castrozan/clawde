@@ -17,30 +17,19 @@ let
 
   clawdeServiceScript = "${../scripts/clawde-service}/clawde-service.py";
 
+  clawdeServiceRestartCommand =
+    if pkgs.stdenv.hostPlatform.isLinux then
+      "systemctl --user restart clawde"
+    else
+      "launchctl kickstart -k gui/UID/org.nix-community.home.clawde";
+
   clawdeSessionStarter = pkgs.writeShellScriptBin "clawde" ''
     export PYTHONPATH=${clawdePythonModuleSearchPath}
-    case "''${1:-}" in
-      active)
-        shift
-        exec ${pkgs.python312}/bin/python3 ${../scripts/agent-wrapper}/activate_after_hours.py "$@"
-        ;;
-      list)
-        shift
-        exec ${pkgs.python312}/bin/python3 ${../scripts/agent-wrapper}/list_agents.py "$@"
-        ;;
-      harness)
-        shift
-        exec ${pkgs.python312}/bin/python3 ${../scripts/agent-wrapper}/harness_control.py "$@"
-        ;;
-      start|stop)
-        exec ${pkgs.python312}/bin/python3 ${../scripts/agent-wrapper}/on_demand_control.py "$@"
-        ;;
-    esac
     export TMUX_BIN=${pkgs.tmux}/bin/tmux
     export DEFAULT_TMUX_SESSION_NAME=${lib.escapeShellArg defaultTmuxSessionName}
-    export SYSTEMD_USER_SERVICE_NAME=clawde
-    export LAUNCHD_LABEL=org.nix-community.home.clawde
-    ${builtins.readFile ../scripts/start-clawde.sh}
+    export CLAWDE_AGENT_WRAPPER_DIR=${../scripts/agent-wrapper}
+    export CLAWDE_SERVICE_RESTART_COMMAND=${lib.escapeShellArg clawdeServiceRestartCommand}
+    exec ${pkgs.python312}/bin/python3 ${../scripts/clawde_cli.py} "$@"
   '';
 
   clawdeGracefulRedeployScript = ../scripts/clawde-redeploy.py;
