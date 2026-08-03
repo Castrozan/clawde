@@ -4,7 +4,6 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from herdr_backend_test_support import (
-    PANE_LIST_JSON,
     TAB_CREATE_JSON,
     TAB_LIST_WP,
     TAB_LIST_WP_ONLY_BOOTSTRAP,
@@ -96,25 +95,36 @@ def test_create_agent_window_creates_the_workspace_when_missing():
     ) in issued
 
 
-def test_relaunch_runs_wrapper_in_existing_workspace_scoped_tab_pane():
+def test_relaunch_replaces_the_existing_tab_before_starting_the_wrapper():
     issued = []
     backend = backend_with_responses(
         issued,
         [
             (("workspace", "list"), WORKSPACE_LIST_WITH_CLAWDE),
             (("tab", "list", "--workspace"), TAB_LIST_WP),
-            (("pane", "list"), PANE_LIST_JSON),
+            (("tab", "create"), TAB_CREATE_JSON),
         ],
     )
     assert backend.relaunch_wrapper_in_window(
         "clawde", "bronze", "exec /nix/store/x-agent"
     )
+    assert ("tab", "close", "wP:t7") in issued
+    assert (
+        "tab",
+        "create",
+        "--workspace",
+        "wP",
+        "--label",
+        "bronze",
+        "--no-focus",
+    ) in issued
     assert (
         "pane",
         "run",
-        "wP:p7",
+        "wZ:p9",
         "CLAWDE_MULTIPLEXER=herdr exec /nix/store/x-agent",
     ) in issued
+    assert not any(command[:3] == ("pane", "run", "wP:p7") for command in issued)
 
 
 def test_remove_agent_window_closes_the_agent_tab():

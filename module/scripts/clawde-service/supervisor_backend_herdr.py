@@ -112,10 +112,15 @@ class HerdrSupervisorBackend(HerdrQueryOperations, SupervisorMultiplexerBackend)
         tab = self.find_agent_tab(session_name, agent_name)
         if tab is None:
             return self.create_agent_window(session_name, agent_name, wrapper_command)
-        pane_id = self.resolve_pane_id_for_tab_id(tab["tab_id"])
-        if pane_id is None:
-            return self.create_agent_window(session_name, agent_name, wrapper_command)
-        return self.run_wrapper_in_pane(pane_id, wrapper_command)
+        close_result = self.run_herdr_command("tab", "close", tab["tab_id"])
+        if close_result.returncode != 0:
+            print(
+                f"Error: failed to replace herdr tab {agent_name!r} in workspace "
+                f"{session_name!r}: {close_result.stderr.strip()}",
+                file=sys.stderr,
+            )
+            return False
+        return self.create_agent_window(session_name, agent_name, wrapper_command)
 
     def ensure_host_ready(self, session_name: str) -> bool:
         if not self.ensure_server_running():
