@@ -6,7 +6,7 @@
   outputs =
     { self, nixpkgs }:
     let
-      lib = nixpkgs.lib;
+      inherit (nixpkgs) lib;
       supportedSystems = [
         "x86_64-linux"
         "aarch64-linux"

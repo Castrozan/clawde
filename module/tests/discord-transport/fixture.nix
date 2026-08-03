@@ -106,10 +106,14 @@ let
         stubHomeModule
         module
         {
-          clawde.agents.fixture-agent = agentConfig;
-          clawde.harnesses.claude.package = pkgs.hello;
-          clawde.harnesses.codex.package = pkgs.hello;
-          clawde.harnesses.opencode.package = pkgs.hello;
+          clawde = {
+            agents.fixture-agent = agentConfig;
+            harnesses = {
+              claude.package = pkgs.hello;
+              codex.package = pkgs.hello;
+              opencode.package = pkgs.hello;
+            };
+          };
         }
       ];
     };
@@ -119,7 +123,7 @@ let
     let
       fileEntry = evaluated.config.home.file.${relativePath};
     in
-    if fileEntry ? text then fileEntry.text else throw "no text at ${relativePath}";
+    fileEntry.text or (throw "no text at ${relativePath}");
 
   launchConfigTextFor =
     evaluated: homeFileTextFor evaluated "clawde/launch-config/fixture-agent.json";
@@ -233,9 +237,11 @@ let
     buildOneShotTurnCommandFor = null;
   };
 
+  resolvedTransportFor = selected: harness: (transportResolution.resolve selected harness).transport;
+
   transportAssertion =
     name: expected: selected: harness:
-    assertion name expected ((transportResolution.resolve selected harness).transport);
+    assertion name expected (resolvedTransportFor selected harness);
 in
 {
   inherit
@@ -247,7 +253,7 @@ in
 
   assertions = [
     (assertion "auto-claude-resolves-embedded" "embedded" (
-      (transportResolution.resolve "auto" fakeEmbeddingHarness).transport
+      resolvedTransportFor "auto" fakeEmbeddingHarness
     ))
     (transportAssertion "auto-codex-resolves-sidecar" "sidecar" "auto" fakeBridgingHarness)
     (transportAssertion "forced-sidecar-on-embedding-harness" "none" "sidecar" fakeEmbeddingHarness)
