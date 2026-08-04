@@ -12,12 +12,24 @@ HERDR_SERVER_STARTUP_WAIT_ATTEMPTS = 30
 HERDR_SERVER_STARTUP_WAIT_DELAY_SECONDS = 0.5
 HERDR_MULTIPLEXER_ENVIRONMENT_VALUE = "herdr"
 HERDR_DEFAULT_WORKSPACE_TAB_LABEL = "1"
+HERDR_SERVER_SYSTEMD_UNIT_NAME = "clawde-herdr-server"
 
 
 class HerdrSupervisorBackend(HerdrQueryOperations, SupervisorMultiplexerBackend):
     def start_headless_herdr_server(self) -> None:
+        server_command = ["herdr", "server"]
+        if sys.platform == "linux":
+            server_command = [
+                "systemd-run",
+                "--user",
+                "--unit",
+                HERDR_SERVER_SYSTEMD_UNIT_NAME,
+                "--collect",
+                "--quiet",
+                *server_command,
+            ]
         subprocess.Popen(
-            ["herdr", "server"],
+            server_command,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,

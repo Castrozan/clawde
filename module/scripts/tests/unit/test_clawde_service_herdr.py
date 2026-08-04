@@ -16,6 +16,41 @@ from herdr_backend_test_support import (
 )
 
 
+def test_start_headless_herdr_server_uses_a_transient_user_service_on_linux(
+    monkeypatch,
+):
+    issued = []
+
+    def record_server_start(command, **keyword_arguments):
+        issued.append((command, keyword_arguments))
+
+    monkeypatch.setattr(herdr_backend.sys, "platform", "linux")
+    monkeypatch.setattr(herdr_backend.subprocess, "Popen", record_server_start)
+
+    herdr_backend.HerdrSupervisorBackend().start_headless_herdr_server()
+
+    assert issued == [
+        (
+            [
+                "systemd-run",
+                "--user",
+                "--unit",
+                "clawde-herdr-server",
+                "--collect",
+                "--quiet",
+                "herdr",
+                "server",
+            ],
+            {
+                "stdout": herdr_backend.subprocess.DEVNULL,
+                "stderr": herdr_backend.subprocess.DEVNULL,
+                "stdin": herdr_backend.subprocess.DEVNULL,
+                "start_new_session": True,
+            },
+        )
+    ]
+
+
 def test_agent_window_exists_is_scoped_to_the_target_workspace():
     backend = backend_with_responses(
         [],
