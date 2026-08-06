@@ -147,5 +147,5 @@ def a_pinned_conversation_is_assumed_to_exist(monkeypatch):
     monkeypatch.setattr(
         launch_session,
         "session_conversation_exists",
-        lambda _profile, _identifier: True,
+        lambda _profile, _identifier, _workspace_directory=None: True,
     )
