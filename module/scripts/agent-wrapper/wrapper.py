@@ -71,6 +71,7 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
         active_weekdays_only = config.get("active_weekdays_only", False)
         daily_session_rotation = config.get("daily_session_rotation", False)
         launch_gate_interval_seconds = config.get("launch_gate_interval_seconds")
+        workspace_directory = config.get("workspace_directory")
         tmux_target = build_tmux_target(config.get("tmux_session"), agent_name)
 
         runtime_root_directory = runtime_root_directory_from_launch_config_path(
@@ -122,6 +123,7 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
                 runtime_root_directory,
                 daily_session_rotation,
                 harness_runtime_profile,
+                workspace_directory,
             )
             return
 
@@ -139,6 +141,7 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
             heartbeat_driver_log_path,
             restart_delay_seconds,
             harness_runtime_profile,
+            workspace_directory,
         )
 
 

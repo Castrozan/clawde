@@ -31,11 +31,14 @@ def resolve_resumable_session_identifier(
     harness_runtime_profile,
     persisted_session_identifier: str | None,
     previous_session_identifiers: list[str],
+    workspace_directory: str | None = None,
 ) -> str | None:
     for candidate_identifier in [
         persisted_session_identifier
     ] + previous_session_identifiers:
-        if session_conversation_exists(harness_runtime_profile, candidate_identifier):
+        if session_conversation_exists(
+            harness_runtime_profile, candidate_identifier, workspace_directory
+        ):
             return candidate_identifier
     return None
 
@@ -45,6 +48,7 @@ def decide_and_persist_launch_session(
     agent_name: str,
     daily_session_rotation: bool,
     harness_runtime_profile,
+    workspace_directory: str | None = None,
 ) -> LaunchSessionDecision:
     session_record_file_path = build_session_record_file_path(
         runtime_root_directory, agent_name
@@ -69,6 +73,7 @@ def decide_and_persist_launch_session(
             harness_runtime_profile,
             persisted_session_identifier,
             previous_session_identifiers,
+            workspace_directory,
         )
     )
     resume_previous_session = resumable_session_identifier is not None
@@ -87,7 +92,9 @@ def decide_and_persist_launch_session(
             previous_session_identifiers,
             session_identifier,
         )
-        if session_conversation_exists(harness_runtime_profile, remembered_identifier)
+        if session_conversation_exists(
+            harness_runtime_profile, remembered_identifier, workspace_directory
+        )
     ]
     write_persisted_session_record(
         session_record_file_path,

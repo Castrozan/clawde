@@ -75,7 +75,7 @@ def test_launch_starts_fresh_when_the_pinned_conversation_never_persisted(
     monkeypatch.setattr(
         launch_session,
         "session_conversation_exists",
-        lambda _profile, _identifier: False,
+        lambda _profile, _identifier, _workspace_directory=None: False,
     )
     runtime_root = tmp_path / "clawde"
     (runtime_root / "session-ids").mkdir(parents=True)
@@ -97,7 +97,7 @@ def test_launch_resumes_when_the_pinned_conversation_exists(tmp_path, monkeypatc
     monkeypatch.setattr(
         launch_session,
         "session_conversation_exists",
-        lambda _profile, _identifier: True,
+        lambda _profile, _identifier, _workspace_directory=None: True,
     )
     runtime_root = tmp_path / "clawde"
     (runtime_root / "session-ids").mkdir(parents=True)
@@ -111,3 +111,48 @@ def test_launch_resumes_when_the_pinned_conversation_exists(tmp_path, monkeypatc
 
     assert decision.resume_previous_session is True
     assert decision.session_argv == "--resume real"
+
+
+def test_a_pinned_conversation_is_probed_under_the_agent_workspace_not_the_wrapper_cwd(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    _write_conversation(tmp_path, "/w/jenny", "real")
+    runtime_root = tmp_path / "clawde"
+    (runtime_root / "session-ids").mkdir(parents=True)
+    (runtime_root / "session-ids" / "jenny.json").write_text(
+        '{"session_identifier": "real", "started_on_date": "2026-07-19"}'
+    )
+
+    decision = launch_session.decide_and_persist_launch_session(
+        str(runtime_root), "jenny", False, CLAUDE_PROFILE, "/w/jenny"
+    )
+
+    assert decision.resume_previous_session is True, (
+        "a wrapper whose process directory is not the agent workspace must still "
+        "find the pinned conversation, or every restart comes back with a zeroed "
+        "session and the remembered history is filtered away with it"
+    )
+    assert decision.session_argv == "--resume real"
+
+
+def test_remembered_history_survives_a_wrapper_running_outside_the_agent_workspace(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    _write_conversation(tmp_path, "/w/jenny", "older")
+    runtime_root = tmp_path / "clawde"
+    (runtime_root / "session-ids").mkdir(parents=True)
+    (runtime_root / "session-ids" / "jenny.json").write_text(
+        '{"session_identifier": "phantom", "started_on_date": "2026-07-19", '
+        '"previous_session_identifiers": ["older"]}'
+    )
+
+    decision = launch_session.decide_and_persist_launch_session(
+        str(runtime_root), "jenny", False, CLAUDE_PROFILE, "/w/jenny"
+    )
+
+    assert decision.resume_previous_session is True
+    assert decision.session_argv == "--resume older"

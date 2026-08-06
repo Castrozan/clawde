@@ -32,12 +32,14 @@ def run_triggered_launch_iteration(
     runtime_root_directory: str,
     daily_session_rotation: bool,
     harness_runtime_profile,
+    workspace_directory: str | None = None,
 ) -> None:
     launch_session = decide_and_persist_launch_session(
         runtime_root_directory,
         agent_name,
         daily_session_rotation,
         harness_runtime_profile,
+        workspace_directory,
     )
     triggered_runtime_seconds, _exceeded_runtime_cap, resume_session_missing = (
         run_launch_command_to_completion(
@@ -83,12 +85,14 @@ def run_warm_session_iteration(
     heartbeat_driver_log_path: str,
     restart_delay_seconds: int,
     harness_runtime_profile,
+    workspace_directory: str | None = None,
 ) -> int:
     launch_session = decide_and_persist_launch_session(
         runtime_root_directory,
         agent_name,
         daily_session_rotation,
         harness_runtime_profile,
+        workspace_directory,
     )
     if launch_session.rotating_session:
         emit_timestamped_log(agent_name, "daily session rotation. Starting fresh.")

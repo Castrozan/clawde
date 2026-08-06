@@ -176,5 +176,5 @@ def a_pinned_conversation_is_assumed_to_exist(monkeypatch):
     monkeypatch.setitem(
         agent_launch_iterations.decide_and_persist_launch_session.__globals__,
         "session_conversation_exists",
-        lambda _profile, _identifier: True,
+        lambda _profile, _identifier, _workspace_directory=None: True,
     )
