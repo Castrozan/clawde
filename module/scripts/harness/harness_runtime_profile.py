@@ -97,17 +97,28 @@ class HarnessRuntimeProfile:
             self.transcript_directory_template and self.transcript_file_name_template
         )
 
+    def render_session_transcript_directory(self, workspace_directory: str) -> str:
+        workspace_slug = NON_ALPHANUMERIC_CHARACTER.sub("-", str(workspace_directory))
+        return os.path.expanduser(
+            self.transcript_directory_template.replace(
+                WORKSPACE_SLUG_TEMPLATE_PLACEHOLDER, workspace_slug
+            )
+        )
+
+    def render_session_transcript_file_name_glob(self) -> str:
+        return self.transcript_file_name_template.replace(
+            SESSION_IDENTIFIER_TEMPLATE_PLACEHOLDER, "*"
+        )
+
     def render_session_transcript_path(
         self, session_identifier: str, workspace_directory: str
     ) -> str:
-        workspace_slug = NON_ALPHANUMERIC_CHARACTER.sub("-", str(workspace_directory))
-        directory = self.transcript_directory_template.replace(
-            WORKSPACE_SLUG_TEMPLATE_PLACEHOLDER, workspace_slug
-        )
         file_name = self.transcript_file_name_template.replace(
             SESSION_IDENTIFIER_TEMPLATE_PLACEHOLDER, session_identifier
         )
-        return os.path.join(os.path.expanduser(directory), file_name)
+        return os.path.join(
+            self.render_session_transcript_directory(workspace_directory), file_name
+        )
 
 
 def load_harness_runtime_profile_from_launch_config(launch_config_path: str):

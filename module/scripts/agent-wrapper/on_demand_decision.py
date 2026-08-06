@@ -13,8 +13,7 @@ from on_demand_lease import (
     read_lease_started_at,
 )
 from harness_runtime_profile import load_harness_runtime_profile_from_launch_config
-from session_persistence import session_conversation_modified_at
-from session_store import build_session_record_file_path, read_persisted_session_record
+from session_persistence import latest_workspace_conversation_modified_at
 
 DEFAULT_IDLE_TIMEOUT_MINUTES = 30
 
@@ -67,12 +66,8 @@ def last_conversation_activity_for_agent(
     harness_runtime_profile = harness_runtime_profile_for_agent(agent_name)
     if harness_runtime_profile is None:
         return None
-    session_identifier, _started_on_date = read_persisted_session_record(
-        build_session_record_file_path(runtime_root_directory(), agent_name)
-    )
-    return session_conversation_modified_at(
+    return latest_workspace_conversation_modified_at(
         harness_runtime_profile,
-        session_identifier,
         workspace_directory_for_agent(agent_name),
     )
 
