@@ -36,7 +36,12 @@ def write_live_session_identifier(runtime_root_directory, session_identifier):
     )
 
 
-def build_parked_agent(tmp_path, initial_transcript_byte_size=4096):
+def append_transcript_entries(transcript_file, entry_count):
+    with open(transcript_file, "a") as open_transcript_file:
+        open_transcript_file.write('{"entry": "recorded"}\n' * entry_count)
+
+
+def build_parked_agent(tmp_path, initial_transcript_entry_count=40):
     runtime_root_directory = str(tmp_path / "clawde")
     write_live_session_identifier(runtime_root_directory, SESSION_IDENTIFIER)
     transcript_directory = (
@@ -47,7 +52,8 @@ def build_parked_agent(tmp_path, initial_transcript_byte_size=4096):
     )
     transcript_directory.mkdir(parents=True, exist_ok=True)
     transcript_file = transcript_directory / f"{SESSION_IDENTIFIER}.jsonl"
-    transcript_file.write_bytes(b"x" * initial_transcript_byte_size)
+    transcript_file.write_text("")
+    append_transcript_entries(transcript_file, initial_transcript_entry_count)
     record_path = harness_productivity_record_path(runtime_root_directory, "steward")
     begin_harness_productivity_record(record_path, "claude")
     observer = heartbeat_turn_productivity.DeliveredTurnObserver(
@@ -60,12 +66,13 @@ def build_parked_agent(tmp_path, initial_transcript_byte_size=4096):
     return observer, record_path, transcript_file
 
 
-def deliver_a_turn(observer, backend, transcript_file, bytes_written_by_the_turn):
+def deliver_a_turn(observer, backend, transcript_file, entries_written_by_the_turn):
     observer.judge_previous_delivery()
-    observer.observe_this_delivery(backend, "pane-handle", lambda _seconds: None)
-    if bytes_written_by_the_turn:
-        with open(transcript_file, "ab") as open_transcript_file:
-            open_transcript_file.write(b"y" * bytes_written_by_the_turn)
+    append_transcript_entries(transcript_file, 1)
+    observer.watch_this_delivery_for_active_work(
+        backend, "pane-handle", lambda _seconds: None
+    )
+    append_transcript_entries(transcript_file, entries_written_by_the_turn)
 
 
 def counted_unproductive_turns(record_path):
@@ -75,7 +82,7 @@ def counted_unproductive_turns(record_path):
 def test_a_transcript_that_grew_between_deliveries_counts_as_work(tmp_path):
     observer, record_path, transcript_file = build_parked_agent(tmp_path)
     for _ in range(3):
-        deliver_a_turn(observer, PaneNeverReportingWork(), transcript_file, 8192)
+        deliver_a_turn(observer, PaneNeverReportingWork(), transcript_file, 4)
     assert counted_unproductive_turns(record_path) == 0
 
 
@@ -100,11 +107,29 @@ def test_a_pane_that_reports_its_own_working_state_is_never_read_as_no_work(tmp_
     )
 
 
+def test_a_turn_finishing_inside_the_watch_window_still_counts_as_work(tmp_path):
+    observer, record_path, transcript_file = build_parked_agent(tmp_path)
+    for _ in range(3):
+        observer.judge_previous_delivery()
+        append_transcript_entries(transcript_file, 3)
+        observer.watch_this_delivery_for_active_work(
+            PaneNeverReportingWork(), "pane-handle", lambda _seconds: None
+        )
+    assert counted_unproductive_turns(record_path) == 0, (
+        "an agent that answers in seconds writes its whole turn before the watch "
+        "window closes, so the measurement has to start before the prompt is sent "
+        "rather than after the window"
+    )
+
+
 def test_a_harness_without_a_readable_transcript_is_never_read_as_no_work(tmp_path):
     observer, record_path, transcript_file = build_parked_agent(tmp_path)
     transcript_file.unlink()
     for _ in range(3):
-        deliver_a_turn(observer, PaneNeverReportingWork(), transcript_file, 0)
+        observer.judge_previous_delivery()
+        observer.watch_this_delivery_for_active_work(
+            PaneNeverReportingWork(), "pane-handle", lambda _seconds: None
+        )
     assert counted_unproductive_turns(record_path) == 0, (
         "missing evidence must not accumulate toward a failover, because moving a "
         "healthy agent off its harness is worse than missing every tick of evidence"
@@ -119,6 +144,6 @@ def test_a_rotated_session_does_not_inherit_the_previous_sessions_measurement(tm
     )
     deliver_a_turn(observer, PaneNeverReportingWork(), transcript_file, 0)
     assert counted_unproductive_turns(record_path) == 0, (
-        "a relaunched session writes a different transcript, so its byte size can "
+        "a relaunched session writes a different transcript, so its entry count can "
         "never be compared against the retired session's measurement"
     )

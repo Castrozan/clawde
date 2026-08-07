@@ -56,7 +56,9 @@ def drive_heartbeat(
             continue
         delivered_turn_observer.judge_previous_delivery()
         backend.send_prompt_to_pane(pane_handle, prompt)
-        delivered_turn_observer.observe_this_delivery(backend, pane_handle)
+        delivered_turn_observer.watch_this_delivery_for_active_work(
+            backend, pane_handle
+        )
 
 
 def parse_arguments() -> argparse.Namespace:

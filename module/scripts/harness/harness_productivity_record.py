@@ -4,6 +4,7 @@ import os
 
 HARNESS_PRODUCTIVITY_SUBDIRECTORY = "harness-productivity"
 CONSECUTIVE_UNPRODUCTIVE_TURNS_BEFORE_FAILOVER = 3
+TRANSCRIPT_ENTRIES_A_PRODUCTIVE_TURN_ADDS = 2
 
 
 def harness_productivity_record_path(
@@ -50,7 +51,7 @@ def begin_harness_productivity_record(
             "session_started_at": (now or datetime.datetime.now()).isoformat(),
             "last_productive_turn_at": previous_record.get("last_productive_turn_at"),
             "delivered_turn_session_identifier": None,
-            "delivered_turn_transcript_byte_size": None,
+            "delivered_turn_transcript_entry_count": None,
             "delivered_turn_showed_active_work": False,
         },
     )
@@ -59,18 +60,21 @@ def begin_harness_productivity_record(
 def delivered_turn_produced_work(
     record: dict,
     session_identifier: str | None,
-    transcript_byte_size: int | None,
+    transcript_entry_count: int | None,
 ) -> bool:
     if record.get("delivered_turn_showed_active_work"):
         return True
-    if transcript_byte_size is None:
+    if transcript_entry_count is None:
         return True
     if record.get("delivered_turn_session_identifier") != session_identifier:
         return True
-    byte_size_after_delivery = record.get("delivered_turn_transcript_byte_size")
-    if not isinstance(byte_size_after_delivery, int):
+    entry_count_before_delivery = record.get("delivered_turn_transcript_entry_count")
+    if not isinstance(entry_count_before_delivery, int):
         return True
-    return transcript_byte_size > byte_size_after_delivery
+    return (
+        transcript_entry_count - entry_count_before_delivery
+        >= TRANSCRIPT_ENTRIES_A_PRODUCTIVE_TURN_ADDS
+    )
 
 
 def record_observed_heartbeat_turn(
@@ -90,33 +94,31 @@ def record_observed_heartbeat_turn(
     return record
 
 
-def judge_previously_delivered_turn(
+def judge_previous_turn_and_baseline_the_next(
     record_file_path: str,
     session_identifier: str | None,
-    transcript_byte_size: int | None,
+    transcript_entry_count: int | None,
     now: datetime.datetime | None = None,
 ) -> dict:
-    return record_observed_heartbeat_turn(
+    judged_record = record_observed_heartbeat_turn(
         record_file_path,
         delivered_turn_produced_work(
             read_harness_productivity_record(record_file_path),
             session_identifier,
-            transcript_byte_size,
+            transcript_entry_count,
         ),
         now,
     )
+    judged_record["delivered_turn_session_identifier"] = session_identifier
+    judged_record["delivered_turn_transcript_entry_count"] = transcript_entry_count
+    judged_record["delivered_turn_showed_active_work"] = False
+    write_harness_productivity_record(record_file_path, judged_record)
+    return judged_record
 
 
-def record_delivered_turn_evidence(
-    record_file_path: str,
-    session_identifier: str | None,
-    transcript_byte_size: int | None,
-    showed_active_work: bool,
-) -> dict:
+def record_that_the_delivered_turn_showed_active_work(record_file_path: str) -> dict:
     record = read_harness_productivity_record(record_file_path)
-    record["delivered_turn_session_identifier"] = session_identifier
-    record["delivered_turn_transcript_byte_size"] = transcript_byte_size
-    record["delivered_turn_showed_active_work"] = showed_active_work
+    record["delivered_turn_showed_active_work"] = True
     write_harness_productivity_record(record_file_path, record)
     return record
 

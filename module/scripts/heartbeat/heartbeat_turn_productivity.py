@@ -1,15 +1,15 @@
-import os
 import time
 
 from harness_productivity_record import (
-    judge_previously_delivered_turn,
-    record_delivered_turn_evidence,
+    judge_previous_turn_and_baseline_the_next,
+    record_that_the_delivered_turn_showed_active_work,
 )
 from session_persistence import session_transcript_file
 from session_store import build_session_record_file_path, read_persisted_session_record
 
 ACTIVE_WORK_SAMPLE_COUNT = 6
 ACTIVE_WORK_SAMPLE_INTERVAL_SECONDS = 5
+TRANSCRIPT_READ_CHUNK_BYTES = 1024 * 1024
 
 
 def live_session_identifier(runtime_root_directory: str, agent_name: str) -> str | None:
@@ -19,7 +19,18 @@ def live_session_identifier(runtime_root_directory: str, agent_name: str) -> str
     return persisted_session_identifier
 
 
-def session_transcript_byte_size(
+def count_lines_in_file(file_path) -> int | None:
+    try:
+        with open(file_path, "rb") as open_file:
+            line_count = 0
+            while chunk := open_file.read(TRANSCRIPT_READ_CHUNK_BYTES):
+                line_count += chunk.count(b"\n")
+        return line_count
+    except OSError:
+        return None
+
+
+def session_transcript_entry_count(
     harness_runtime_profile,
     session_identifier: str | None,
     workspace_directory: str | None,
@@ -28,14 +39,11 @@ def session_transcript_byte_size(
         return None
     if not harness_runtime_profile.exposes_session_transcript_store():
         return None
-    try:
-        return os.stat(
-            session_transcript_file(
-                harness_runtime_profile, session_identifier, workspace_directory
-            )
-        ).st_size
-    except OSError:
-        return None
+    return count_lines_in_file(
+        session_transcript_file(
+            harness_runtime_profile, session_identifier, workspace_directory
+        )
+    )
 
 
 class DeliveredTurnObserver:
@@ -53,32 +61,25 @@ class DeliveredTurnObserver:
         self.agent_name = agent_name
         self.workspace_directory = workspace_directory
 
-    def current_transcript_evidence(self) -> tuple[str | None, int | None]:
+    def judge_previous_delivery(self) -> dict:
         session_identifier = live_session_identifier(
             self.runtime_root_directory, self.agent_name
         )
-        return session_identifier, session_transcript_byte_size(
-            self.harness_runtime_profile, session_identifier, self.workspace_directory
+        return judge_previous_turn_and_baseline_the_next(
+            self.record_file_path,
+            session_identifier,
+            session_transcript_entry_count(
+                self.harness_runtime_profile,
+                session_identifier,
+                self.workspace_directory,
+            ),
         )
 
-    def judge_previous_delivery(self) -> dict:
-        session_identifier, transcript_byte_size = self.current_transcript_evidence()
-        return judge_previously_delivered_turn(
-            self.record_file_path, session_identifier, transcript_byte_size
-        )
-
-    def observe_this_delivery(
+    def watch_this_delivery_for_active_work(
         self, backend, pane_handle, sleep_function=time.sleep
-    ) -> dict:
-        showed_active_work = False
+    ) -> None:
         for _ in range(ACTIVE_WORK_SAMPLE_COUNT):
             sleep_function(ACTIVE_WORK_SAMPLE_INTERVAL_SECONDS)
             if backend.pane_reports_active_work(pane_handle):
-                showed_active_work = True
-        session_identifier, transcript_byte_size = self.current_transcript_evidence()
-        return record_delivered_turn_evidence(
-            self.record_file_path,
-            session_identifier,
-            transcript_byte_size,
-            showed_active_work,
-        )
+                record_that_the_delivered_turn_showed_active_work(self.record_file_path)
+                return
