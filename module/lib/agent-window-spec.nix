@@ -63,6 +63,8 @@ let
   buildHeartbeatDriverArgv =
     name: agent:
     [
+      "${pkgs.coreutils}/bin/env"
+      "PYTHONPATH=${../scripts/agent-wrapper}:${../scripts/harness}"
       "${pkgs.python312}/bin/python3"
       "${../scripts/heartbeat}/driver.py"
       "--session"
