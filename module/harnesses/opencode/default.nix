@@ -85,6 +85,7 @@ in
         ];
 
         usageLimitIndicators = [
+          "usage limit reached"
           "You have exceeded your usage limit"
           "rate limit exceeded"
           "quota exceeded"
