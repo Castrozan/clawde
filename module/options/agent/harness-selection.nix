@@ -12,6 +12,11 @@
             default = "claude";
             description = "Agent CLI this agent runs on. Selects a registered clawde.harnesses entry that owns the launch command, the pane markers the runtime reads, session resume, and the harness's own per-agent configuration files.";
           };
+          harnessFallbackChain = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            default = [ ];
+            description = "Harnesses to move this agent onto, in order, when its current one stops producing turns because its provider is refusing work. The runtime rotates through the declared harness followed by this list, so the last entry falls back to the first; entries not in the agent's eligible set are skipped. Each move is a runtime override that expires, returning the agent to its declared harness to retry it. Empty leaves the agent parked on a refusing harness, which is only right for an agent whose work is meaningless elsewhere.";
+          };
           model = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
             default = null;

@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 
@@ -30,21 +31,55 @@ def override_file_path_for_launch_config(launch_config_path: str) -> str:
     )
 
 
-def read_overridden_harness_name(override_file_path: str) -> str | None:
+def read_harness_override(override_file_path: str) -> dict:
     try:
         with open(override_file_path) as override_file:
-            stored_harness_name = json.load(override_file)["harness"]
-    except (OSError, ValueError, KeyError, TypeError):
+            override = json.load(override_file)
+    except (OSError, ValueError):
+        return {}
+    return override if isinstance(override, dict) else {}
+
+
+def harness_override_has_expired(
+    override: dict, now: datetime.datetime | None = None
+) -> bool:
+    expires_at = override.get("expires_at")
+    if not isinstance(expires_at, str):
+        return False
+    try:
+        return datetime.datetime.fromisoformat(expires_at) <= (
+            now or datetime.datetime.now()
+        )
+    except ValueError:
+        return False
+
+
+def read_overridden_harness_name(
+    override_file_path: str, now: datetime.datetime | None = None
+) -> str | None:
+    override = read_harness_override(override_file_path)
+    if harness_override_has_expired(override, now):
         return None
+    stored_harness_name = override.get("harness")
     if isinstance(stored_harness_name, str) and stored_harness_name:
         return stored_harness_name
     return None
 
 
-def write_overridden_harness_name(override_file_path: str, harness_name: str) -> None:
+def write_overridden_harness_name(
+    override_file_path: str,
+    harness_name: str,
+    expires_at: datetime.datetime | None = None,
+    superseded_harness_name: str | None = None,
+) -> None:
     os.makedirs(os.path.dirname(override_file_path), exist_ok=True)
+    override = {"harness": harness_name}
+    if expires_at is not None:
+        override["expires_at"] = expires_at.isoformat()
+    if superseded_harness_name is not None:
+        override["superseded_harness"] = superseded_harness_name
     with open(override_file_path, "w") as override_file:
-        json.dump({"harness": harness_name}, override_file)
+        json.dump(override, override_file)
 
 
 def clear_override(override_file_path: str) -> None:

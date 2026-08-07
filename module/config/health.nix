@@ -10,6 +10,7 @@ let
   sharedHarnessDirectory = ../scripts/harness;
   agentPaneResponsivenessCheckerScript = "${agentWrapperDirectory}/check_agent_pane_responsiveness.py";
   agentExpectedRunningCheckerScript = "${agentWrapperDirectory}/agent_expected_running.py";
+  agentHarnessProductivityCheckerScript = "${agentWrapperDirectory}/check_agent_harness_productivity.py";
 
   agentExpectedRunningCommand =
     agentName:
@@ -51,7 +52,23 @@ let
     }
   ) config.clawde.agents;
 
-  clawdeAgentProbes = clawdeAgentProcessProbes ++ clawdeAgentPaneLivenessProbes;
+  clawdeAgentHarnessProductivityProbes = lib.mapAttrsToList (
+    agentName: _agentConfig:
+    healthCheckLib.mkCommandProbe {
+      name = "clawde agent harness productivity: ${agentName}";
+      applicableWhen = agentExpectedRunningCommand agentName;
+      command = lib.concatStringsSep " " [
+        "PYTHONPATH=${lib.escapeShellArg "${agentWrapperDirectory}:${sharedHarnessDirectory}"}"
+        "${pkgs.python312}/bin/python3"
+        "${agentHarnessProductivityCheckerScript}"
+        "--agent-name"
+        (lib.escapeShellArg agentName)
+      ];
+    }
+  ) config.clawde.agents;
+
+  clawdeAgentProbes =
+    clawdeAgentProcessProbes ++ clawdeAgentPaneLivenessProbes ++ clawdeAgentHarnessProductivityProbes;
 
   clawdeServiceProbe =
     if pkgs.stdenv.hostPlatform.isDarwin then

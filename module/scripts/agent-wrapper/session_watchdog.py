@@ -53,6 +53,7 @@ def run_launch_command_once(
     daily_session_rotation: bool = False,
     heartbeat_driver_log_path: str | None = None,
     is_resume_launch: bool = False,
+    reason_to_replace_session=None,
 ) -> tuple[float, bool, bool]:
     start_time = time.time()
     session_start_date = time.strftime("%Y-%m-%d")
@@ -89,6 +90,22 @@ def run_launch_command_once(
                     )
                     terminate_process_tree(agent_process.pid)
                     agent_process.wait()
+                    break
+                session_replacement_reason = (
+                    None
+                    if reason_to_replace_session is None
+                    else reason_to_replace_session()
+                )
+                if session_replacement_reason is not None:
+                    print(
+                        f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
+                        f"{session_replacement_reason}. "
+                        "Terminating session so the supervisor relaunches it.",
+                        flush=True,
+                    )
+                    terminate_process_tree(agent_process.pid)
+                    agent_process.wait()
+                    was_stuck_kill = True
                     break
                 if heartbeat_driver_has_given_up(driver_process):
                     print(

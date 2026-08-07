@@ -37,6 +37,9 @@ in
                 builtins.filter (
                   param: (agent.typeParams.${agent.type}.${param} or null) == null
                 ) typeDefinition.requiredParams;
+            unreachableFallbackHarnesses = builtins.filter (
+              harnessName: !(builtins.elem harnessName (helpers.eligibleHarnessNamesFor name))
+            ) effectiveAgent.harnessFallbackChain;
             discordTransportResolution =
               if agent.channel.type == "discord" then
                 (import ../lib/discord-transport.nix { inherit lib; }).resolve
@@ -95,6 +98,10 @@ in
               } and its headless one-shot turn command is ${
                 if harnessDefinition.buildOneShotTurnCommandFor == null then "absent" else "present"
               }; set the transport to a value the harness can serve, or move the agent to another harness.";
+            }
+            {
+              assertion = unreachableFallbackHarnesses == [ ];
+              message = "Agent ${name}: harnessFallbackChain names ${lib.concatStringsSep ", " unreachableFallbackHarnesses}, which this agent is not eligible for, so the runtime would skip past them and the agent would never actually land there. It is eligible for ${lib.concatStringsSep ", " (helpers.eligibleHarnessNamesFor name)}; a harness drops off that list when it is not installed, when it cannot transport the agent's channel, or when it cannot enforce the agent's deny patterns.";
             }
             {
               assertion = unenforceableDenyToolPatterns == [ ];

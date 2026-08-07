@@ -4,8 +4,15 @@ import subprocess
 import sys
 import time
 
+from active_harness import runtime_root_directory_from_launch_config_path
 from cron import cron_expression_matches, seconds_until_next_minute_boundary
+from harness_productivity_record import (
+    begin_harness_productivity_record,
+    harness_productivity_record_path,
+    record_observed_heartbeat_turn,
+)
 from harness_runtime_profile import load_harness_runtime_profile_from_launch_config
+from heartbeat_turn_productivity import delivered_turn_is_still_running
 from multiplexer import select_heartbeat_backend
 from pane_content import HeartbeatMultiplexerBackend
 
@@ -34,6 +41,7 @@ def drive_heartbeat(
     cron_expression: str,
     prompt: str,
     gate_command: str | None,
+    productivity_record_path: str,
 ) -> None:
     while True:
         time.sleep(seconds_until_next_minute_boundary(datetime.datetime.now()))
@@ -45,6 +53,12 @@ def drive_heartbeat(
         if not gate_allows_wake(gate_command):
             continue
         backend.send_prompt_to_pane(pane_handle, prompt)
+        record_observed_heartbeat_turn(
+            productivity_record_path,
+            delivered_turn_is_still_running(
+                backend, pane_handle, harness_runtime_profile
+            ),
+        )
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -84,6 +98,14 @@ def main() -> None:
         args.launch_config
     )
 
+    productivity_record_path = harness_productivity_record_path(
+        runtime_root_directory_from_launch_config_path(args.launch_config),
+        args.window,
+    )
+    begin_harness_productivity_record(
+        productivity_record_path, harness_runtime_profile.harness_name
+    )
+
     backend = select_heartbeat_backend()
     pane_handle = backend.prepare_pane_handle(args.session, args.window)
     if pane_handle is None:
@@ -108,6 +130,7 @@ def main() -> None:
         args.interval,
         args.prompt,
         args.gate_command,
+        productivity_record_path,
     )
 
 

@@ -98,6 +98,7 @@ let
 
   buildAgentLaunchConfig = name: agent: {
     declared_harness = agent.harness;
+    harness_fallback_chain = agent.harnessFallbackChain;
     harness_launch_commands = launchCommandByHarnessName name;
     harness_runtime_profiles = runtimeProfileByHarnessName name;
     heartbeat_driver_argv =

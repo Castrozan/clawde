@@ -5,6 +5,7 @@ from active_hours_override import (
     active_hours_gate_allows_run,
     read_override_active_until,
 )
+from agent_log import emit_timestamped_log
 from launch_gate import run_launch_command_to_completion
 from launch_session import decide_and_persist_launch_session
 from redeploy_signals import register_current_child_process_id
@@ -16,13 +17,6 @@ from restart_scheduling import (
 )
 from session_store import forget_session_identifier_from_record
 from session_watchdog import run_launch_command_once
-
-
-def emit_timestamped_log(agent_name: str, message: str) -> None:
-    print(
-        f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Agent {agent_name} {message}",
-        flush=True,
-    )
 
 
 def run_triggered_launch_iteration(
@@ -86,6 +80,7 @@ def run_warm_session_iteration(
     restart_delay_seconds: int,
     harness_runtime_profile,
     workspace_directory: str | None = None,
+    reason_to_replace_session=None,
 ) -> int:
     launch_session = decide_and_persist_launch_session(
         runtime_root_directory,
@@ -108,6 +103,7 @@ def run_warm_session_iteration(
         daily_session_rotation=daily_session_rotation,
         heartbeat_driver_log_path=heartbeat_driver_log_path,
         is_resume_launch=launch_session.resume_previous_session,
+        reason_to_replace_session=reason_to_replace_session,
     )
 
     if resume_session_missing:

@@ -9,6 +9,7 @@ from active_harness import (
     declared_harness_name,
     eligible_harness_names,
     override_file_path_for_agent,
+    read_harness_override,
     write_overridden_harness_name,
 )
 from agent_wrapper_processes import find_wrapper_process_id_for_agent
@@ -38,11 +39,25 @@ def active_harness_for_agent(agent_name: str, launch_config: dict) -> str:
     )
 
 
+def describe_override(agent_name: str, declared_harness: str) -> str:
+    override = read_harness_override(
+        override_file_path_for_agent(runtime_root_directory(), agent_name)
+    )
+    superseded_harness = override.get("superseded_harness")
+    if superseded_harness is None:
+        return f" (overriding {declared_harness})"
+    return (
+        f" (failed over from {superseded_harness}, which stopped producing turns; "
+        f"returns to {declared_harness} at {override.get('expires_at')})"
+    )
+
+
 def describe_one_agent(agent_name: str, launch_config: dict) -> str:
     declared = declared_harness_name(launch_config)
     active = active_harness_for_agent(agent_name, launch_config)
-    overridden_marker = "" if active == declared else f" (overriding {declared})"
-    return f"{agent_name}: {active}{overridden_marker}"
+    if active == declared:
+        return f"{agent_name}: {active}"
+    return f"{agent_name}: {active}{describe_override(agent_name, declared)}"
 
 
 def show_every_agent_harness() -> None:

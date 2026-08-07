@@ -15,15 +15,21 @@ from agent_launch_iterations import (
     run_triggered_launch_iteration,
     run_warm_session_iteration,
 )
+from agent_log import emit_timestamped_log
 from redeploy_signals import (
     install_exit_signal_handlers,
     install_redeploy_signal_handler,
 )
 from active_harness import (
-    active_harness_name_for_launch_config,
     active_launch_command,
     active_runtime_profile_mapping,
 )
+from harness_failover import (
+    build_refusing_harness_replacement_reason,
+    harness_for_next_launch,
+    next_harness_after_refusal,
+)
+from harness_productivity_record import harness_productivity_record_path
 from harness_runtime_profile import HarnessRuntimeProfile
 from heartbeat_driver_process import heartbeat_driver_log_path_for_agent
 from restart_scheduling import (
@@ -51,16 +57,15 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
         try:
             config = load_agent_launch_config(config_file_path)
         except (OSError, ValueError) as config_error:
-            print(
-                f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
-                f"Agent {agent_name} could not read launch config "
-                f"{config_file_path}: {config_error}. Retrying shortly.",
-                flush=True,
+            emit_timestamped_log(
+                agent_name,
+                f"could not read launch config {config_file_path}: "
+                f"{config_error}. Retrying shortly.",
             )
             time.sleep(INITIAL_RESTART_DELAY_SECONDS)
             continue
 
-        active_harness = active_harness_name_for_launch_config(config, config_file_path)
+        active_harness = harness_for_next_launch(agent_name, config, config_file_path)
         launch_command = active_launch_command(config, active_harness)
         harness_runtime_profile = HarnessRuntimeProfile(
             active_runtime_profile_mapping(config, active_harness)
@@ -98,21 +103,19 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
             within_active_hours, override_active_until, now
         ):
             sleep_seconds = seconds_until_active_hours_start(active_hours_start)
-            print(
-                f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
-                f"Agent {agent_name} outside active hours. "
-                f"Sleeping {sleep_seconds} seconds until {active_hours_start}:00...",
-                flush=True,
+            emit_timestamped_log(
+                agent_name,
+                f"outside active hours. Sleeping {sleep_seconds} seconds until "
+                f"{active_hours_start}:00...",
             )
             time.sleep(sleep_seconds)
             continue
 
         if not within_active_hours:
-            print(
-                f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
-                f"Agent {agent_name} active-hours override in effect until "
+            emit_timestamped_log(
+                agent_name,
+                f"active-hours override in effect until "
                 f"{override_active_until.isoformat()}. Running outside normal hours.",
-                flush=True,
             )
 
         if launch_gate_interval_seconds is not None:
@@ -142,6 +145,11 @@ def supervise_agent_forever(agent_name: str, config_file_path: str) -> None:
             restart_delay_seconds,
             harness_runtime_profile,
             workspace_directory,
+            build_refusing_harness_replacement_reason(
+                harness_productivity_record_path(runtime_root_directory, agent_name),
+                active_harness,
+                next_harness_after_refusal(config, active_harness),
+            ),
         )
 
 
