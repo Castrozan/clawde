@@ -10,6 +10,11 @@ from active_harness import (
 SESSION_IDENTIFIER_TEMPLATE_PLACEHOLDER = "{session_identifier}"
 WORKSPACE_SLUG_TEMPLATE_PLACEHOLDER = "{workspace_slug}"
 NON_ALPHANUMERIC_CHARACTER = re.compile(r"[^a-zA-Z0-9]")
+ANY_WHITESPACE_RUN = re.compile(r"\s+")
+
+
+def without_any_whitespace(text: str) -> str:
+    return ANY_WHITESPACE_RUN.sub("", text)
 
 
 class HarnessRuntimeProfile:
@@ -50,8 +55,10 @@ class HarnessRuntimeProfile:
         )
 
     def pane_indicates_usage_limit_modal(self, pane_content: str) -> bool:
+        pane_content_without_wrapping = without_any_whitespace(pane_content)
         return any(
-            indicator in pane_content for indicator in self.usage_limit_indicators
+            without_any_whitespace(indicator) in pane_content_without_wrapping
+            for indicator in self.usage_limit_indicators
         )
 
     def pane_indicates_missing_resume_session(self, pane_content: str) -> bool:

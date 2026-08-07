@@ -66,12 +66,39 @@ CODEX_PROFILE_MAPPING = {
 }
 
 
+OPENCODE_PROFILE_MAPPING = {
+    "harness_name": "opencode",
+    "live_process_name_fragment": "opencode",
+    "idle_prompt_line_patterns": ["^(?!.*esc interrupt).*ctrl\\+p commands"],
+    "onboarding_indicators": ["Select a provider", "opencode auth login"],
+    "usage_limit_indicators": [
+        "usage limit reached",
+        "You have exceeded your usage limit",
+        "rate limit exceeded",
+        "quota exceeded",
+    ],
+    "session_identity": {
+        "generates_identifier": False,
+        "fresh_argv_template": "",
+        "resume_argv_template": "--continue",
+    },
+    "session_transcript_store": {
+        "directory_template": "",
+        "file_name_template": "",
+    },
+}
+
+
 def make_claude_profile() -> HarnessRuntimeProfile:
     return HarnessRuntimeProfile(CLAUDE_PROFILE_MAPPING)
 
 
 def make_codex_profile() -> HarnessRuntimeProfile:
     return HarnessRuntimeProfile(CODEX_PROFILE_MAPPING)
+
+
+def make_opencode_profile() -> HarnessRuntimeProfile:
+    return HarnessRuntimeProfile(OPENCODE_PROFILE_MAPPING)
 
 
 def harness_launch_config_block(profile_mapping, launch_command):
