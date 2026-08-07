@@ -6,7 +6,6 @@ from pane_content import HeartbeatMultiplexerBackend
 
 CAPTURE_LINE_COUNT = 10
 HERDR_PANE_ID_ENVIRONMENT_VARIABLE = "HERDR_PANE_ID"
-REPORTED_AGENT_STATES_THAT_FORBID_TYPING = ("working", "blocked")
 
 
 def run_herdr_command(*arguments: str) -> subprocess.CompletedProcess:
@@ -74,22 +73,6 @@ class HerdrHeartbeatBackend(HeartbeatMultiplexerBackend):
         if pane_id is None:
             return None
         return HerdrPaneHandle(pane_id)
-
-    def reported_agent_state(self, pane_handle: HerdrPaneHandle) -> str | None:
-        result = run_herdr_command("pane", "get", pane_handle.pane_id)
-        if result.returncode != 0:
-            return None
-        payload = parse_herdr_json(result.stdout)
-        if payload is None:
-            return None
-        return payload.get("result", {}).get("pane", {}).get("agent_status")
-
-    def pane_is_idle(self, pane_handle: HerdrPaneHandle, harness_runtime_profile):
-        if self.reported_agent_state(pane_handle) in (
-            REPORTED_AGENT_STATES_THAT_FORBID_TYPING
-        ):
-            return False
-        return super().pane_is_idle(pane_handle, harness_runtime_profile)
 
     def capture_recent_pane(self, pane_handle: HerdrPaneHandle) -> str | None:
         result = run_herdr_command(
