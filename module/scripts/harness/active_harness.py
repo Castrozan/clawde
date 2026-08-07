@@ -89,6 +89,15 @@ def clear_override(override_file_path: str) -> None:
         pass
 
 
+def read_launch_config(launch_config_path: str) -> dict:
+    try:
+        with open(launch_config_path) as launch_config_file:
+            launch_config = json.load(launch_config_file)
+    except (OSError, ValueError):
+        return {}
+    return launch_config if isinstance(launch_config, dict) else {}
+
+
 def eligible_harness_names(launch_config: dict) -> list[str]:
     return sorted(launch_config.get(LAUNCH_COMMANDS_LAUNCH_CONFIG_KEY, {}))
 

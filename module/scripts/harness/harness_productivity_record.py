@@ -49,8 +49,28 @@ def begin_harness_productivity_record(
             "consecutive_unproductive_turns": 0,
             "session_started_at": (now or datetime.datetime.now()).isoformat(),
             "last_productive_turn_at": previous_record.get("last_productive_turn_at"),
+            "delivered_turn_session_identifier": None,
+            "delivered_turn_transcript_byte_size": None,
+            "delivered_turn_showed_active_work": False,
         },
     )
+
+
+def delivered_turn_produced_work(
+    record: dict,
+    session_identifier: str | None,
+    transcript_byte_size: int | None,
+) -> bool:
+    if record.get("delivered_turn_showed_active_work"):
+        return True
+    if transcript_byte_size is None:
+        return True
+    if record.get("delivered_turn_session_identifier") != session_identifier:
+        return True
+    byte_size_after_delivery = record.get("delivered_turn_transcript_byte_size")
+    if not isinstance(byte_size_after_delivery, int):
+        return True
+    return transcript_byte_size > byte_size_after_delivery
 
 
 def record_observed_heartbeat_turn(
@@ -66,6 +86,37 @@ def record_observed_heartbeat_turn(
     record["last_turn_observed_at"] = observed_at
     if turn_was_productive:
         record["last_productive_turn_at"] = observed_at
+    write_harness_productivity_record(record_file_path, record)
+    return record
+
+
+def judge_previously_delivered_turn(
+    record_file_path: str,
+    session_identifier: str | None,
+    transcript_byte_size: int | None,
+    now: datetime.datetime | None = None,
+) -> dict:
+    return record_observed_heartbeat_turn(
+        record_file_path,
+        delivered_turn_produced_work(
+            read_harness_productivity_record(record_file_path),
+            session_identifier,
+            transcript_byte_size,
+        ),
+        now,
+    )
+
+
+def record_delivered_turn_evidence(
+    record_file_path: str,
+    session_identifier: str | None,
+    transcript_byte_size: int | None,
+    showed_active_work: bool,
+) -> dict:
+    record = read_harness_productivity_record(record_file_path)
+    record["delivered_turn_session_identifier"] = session_identifier
+    record["delivered_turn_transcript_byte_size"] = transcript_byte_size
+    record["delivered_turn_showed_active_work"] = showed_active_work
     write_harness_productivity_record(record_file_path, record)
     return record
 

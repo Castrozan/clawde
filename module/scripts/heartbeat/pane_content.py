@@ -55,6 +55,9 @@ class HeartbeatMultiplexerBackend:
             time.sleep(PANE_RECHECK_DELAY_SECONDS)
         return False
 
+    def pane_reports_active_work(self, pane_handle) -> bool:
+        return False
+
     def pane_is_idle(self, pane_handle, harness_runtime_profile) -> bool:
         content = self.capture_recent_pane(pane_handle)
         return content is not None and harness_runtime_profile.pane_is_at_idle_prompt(

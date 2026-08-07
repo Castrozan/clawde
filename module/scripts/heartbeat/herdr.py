@@ -84,10 +84,14 @@ class HerdrHeartbeatBackend(HeartbeatMultiplexerBackend):
             return None
         return payload.get("result", {}).get("pane", {}).get("agent_status")
 
+    def pane_reports_active_work(self, pane_handle: HerdrPaneHandle) -> bool:
+        return (
+            self.reported_agent_state(pane_handle)
+            in REPORTED_AGENT_STATES_THAT_FORBID_TYPING
+        )
+
     def pane_is_idle(self, pane_handle: HerdrPaneHandle, harness_runtime_profile):
-        if self.reported_agent_state(pane_handle) in (
-            REPORTED_AGENT_STATES_THAT_FORBID_TYPING
-        ):
+        if self.pane_reports_active_work(pane_handle):
             return False
         return super().pane_is_idle(pane_handle, harness_runtime_profile)
 
