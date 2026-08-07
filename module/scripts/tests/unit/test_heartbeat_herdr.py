@@ -121,3 +121,59 @@ def test_send_prompt_writes_text_then_enter(monkeypatch):
         ("pane", "send-text", "wP:p7", "wake up"),
         ("pane", "send-keys", "wP:p7", "Enter"),
     ]
+
+
+CLAUDE_IDLE_CAPTURE = "⏺ Done.\n\n ❯\n"
+
+
+def pane_get_json(agent_status):
+    return '{"result":{"pane":{"pane_id":"wP:p7","agent_status":"%s"}}}' % agent_status
+
+
+def backend_reading(monkeypatch, pane_get_stdout, pane_get_returncode=0):
+    def fake_run(*arguments):
+        if arguments[:2] == ("pane", "get"):
+            return _CompletedProcessStub(pane_get_returncode, pane_get_stdout)
+        return _CompletedProcessStub(0, CLAUDE_IDLE_CAPTURE)
+
+    monkeypatch.setattr(herdr_module, "run_herdr_command", fake_run)
+    return herdr_module.HerdrHeartbeatBackend()
+
+
+def claude_profile():
+    from harness_profile_test_helpers import make_claude_profile
+
+    return make_claude_profile()
+
+
+def test_a_pane_reported_working_is_not_idle_even_at_a_prompt(monkeypatch):
+    backend = backend_reading(monkeypatch, pane_get_json("working"))
+    handle = herdr_module.HerdrPaneHandle("wP:p7")
+    assert backend.pane_is_idle(handle, claude_profile()) is False, (
+        "the harness reports its own state through herdr, so a reported working "
+        "agent must veto the send however idle its last rendered line looks"
+    )
+
+
+def test_a_pane_reported_blocked_is_not_idle(monkeypatch):
+    backend = backend_reading(monkeypatch, pane_get_json("blocked"))
+    handle = herdr_module.HerdrPaneHandle("wP:p7")
+    assert backend.pane_is_idle(handle, claude_profile()) is False
+
+
+def test_a_pane_reported_idle_still_has_to_pass_the_capture_check(monkeypatch):
+    backend = backend_reading(monkeypatch, pane_get_json("idle"))
+    handle = herdr_module.HerdrPaneHandle("wP:p7")
+    assert backend.pane_is_idle(handle, claude_profile()) is True
+
+
+def test_an_unknown_reported_state_falls_back_to_the_capture_check(monkeypatch):
+    backend = backend_reading(monkeypatch, pane_get_json("unknown"))
+    handle = herdr_module.HerdrPaneHandle("wP:p7")
+    assert backend.pane_is_idle(handle, claude_profile()) is True
+
+
+def test_an_unreadable_pane_get_falls_back_to_the_capture_check(monkeypatch):
+    backend = backend_reading(monkeypatch, "", pane_get_returncode=1)
+    handle = herdr_module.HerdrPaneHandle("wP:p7")
+    assert backend.pane_is_idle(handle, claude_profile()) is True
