@@ -44,13 +44,16 @@ _clawde() {
 	subcommand="${COMP_WORDS[1]:-}"
 
 	if [ "$COMP_CWORD" -eq 1 ]; then
-		mapfile -t COMPREPLY < <(compgen -W "active harness help list start stop --help -h" -- "$current_word")
+		mapfile -t COMPREPLY < <(compgen -W "active harness help list restart start stop --help -h" -- "$current_word")
 		return 0
 	fi
 
 	case "$subcommand" in
 	start | stop)
 		candidate_words="$(_clawde_on_demand_agent_names)"
+		;;
+	restart)
+		candidate_words="$(_clawde_deployed_agent_names)"
 		;;
 	harness)
 		if [ "$COMP_CWORD" -ge 3 ]; then

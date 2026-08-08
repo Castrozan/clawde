@@ -16,6 +16,8 @@ Commands:
   harness  Show or switch the harness a deployed agent runs on.
   list     List every deployed agent with its active-hours window, override,
            and on-demand state.
+  restart  Restart a deployed agent so it adopts new wrapper code, terminating
+           its wrapper and harness for the supervisor to relaunch.
   start    Start an on-demand agent on a lease the supervisor honours until it
            goes idle past its timeout.
   stop     Stop an on-demand agent, preserving its session for the next start.
@@ -30,6 +32,7 @@ SUBCOMMAND_SCRIPT_PATHS = {
     "active": ("activate_after_hours.py", False),
     "harness": ("harness_control.py", False),
     "list": ("list_agents.py", False),
+    "restart": ("restart_agent.py", False),
     "start": ("on_demand_control.py", True),
     "stop": ("on_demand_control.py", True),
 }
