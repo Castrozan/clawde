@@ -18,6 +18,14 @@ let
   discordAdapterInstructions = builtins.readFile ./instructions/discord-runtime.md;
   discordSidecarAdapterInstructions = builtins.readFile ./instructions/discord-runtime-sidecar.md;
 
+  bridge = import ./bridge.nix { inherit pkgs lib homeDir; };
+  inherit (bridge)
+    waitForSecretScript
+    discordChannelEnvDirectoryFor
+    discordBridgeProcessMatchPatternFor
+    discordBridgeCommandFor
+    ;
+
   updateClaudePluginsMarketplace = pkgs.writeShellScript "update-claude-plugins-marketplace" ''
     export MARKETPLACE_DIR=${lib.escapeShellArg "${homeDir}/.claude/plugins/marketplaces/claude-plugins-official"}
     export GIT_BIN=${pkgs.git}/bin/git
@@ -32,53 +40,15 @@ let
     builtins.readFile ../../scripts/inject-one-secret.sh
   );
 
-  waitForSecretScript = pkgs.writeShellScript "wait-for-discord-bot-token-secret" (
-    builtins.readFile ./scripts/wait-for-secret.sh
-  );
-
-  discordChannelEnvDirectoryFor = name: "${homeDir}/.claude/channels/discord/${name}";
-
   sharedDiscordAccessFile = "${homeDir}/.claude/channels/discord/access.json";
 
   mergeDiscordChannelAccessCommand = "${pkgs.python312}/bin/python3 ${../../scripts/merge-discord-channel-access.py}";
-
-  bridgePythonEnvironment = pkgs.python312.withPackages (pythonPackages: [
-    pythonPackages.discordpy
-  ]);
-
-  discordBridgeIdentifyingArgumentsFor =
-    name: "--agent-name ${lib.escapeShellArg name} --one-shot-turn-command";
-
-  discordBridgeProcessMatchPatternFor =
-    name: "bridge.py ${discordBridgeIdentifyingArgumentsFor name}";
 
   discordTransportForAgent =
     agent:
     (discordTransportResolution.resolve agent.channel.discord.transport (
       config.clawde.harnesses.${agent.harness} or null
     )).transport;
-
-  discordBridgeCommandFor =
-    {
-      name,
-      agent,
-      workspaceDirectory,
-      oneShotTurnCommand,
-    }:
-    let
-      tokenFile = lib.escapeShellArg "${secretsDirectory}/${toString agent.channel.discord.botTokenSecretName}";
-      hasToken = agent.channel.discord.botTokenSecretName != null;
-      waitForTokenPrefix = lib.optionalString hasToken "${waitForSecretScript} ${tokenFile} && ";
-      tokenAssignment = lib.optionalString hasToken "DISCORD_BOT_TOKEN=$(cat ${tokenFile}) ";
-      rotationFlag = lib.optionalString agent.dailySessionRotation "--daily-session-rotation";
-      bridgeArguments = lib.concatStringsSep " " [
-        "${./scripts/bridge.py} ${discordBridgeIdentifyingArgumentsFor name} ${lib.escapeShellArg oneShotTurnCommand}"
-        "--workspace-directory ${lib.escapeShellArg workspaceDirectory}"
-        "--state-directory ${lib.escapeShellArg (discordChannelEnvDirectoryFor name)}"
-        rotationFlag
-      ];
-    in
-    "${waitForTokenPrefix}${tokenAssignment}PYTHONPATH=${./scripts} exec ${bridgePythonEnvironment}/bin/python3 ${bridgeArguments}";
 in
 {
   options.clawde.agents = lib.mkOption {
@@ -177,9 +147,9 @@ in
           name,
           agent,
           workspaceDirectory,
-          oneShotTurnCommand,
+          launchConfigPath,
         }:
-        lib.optionals (oneShotTurnCommand != null) [
+        [
           {
             name = "${name}-discord";
             command = discordBridgeCommandFor {
@@ -187,7 +157,7 @@ in
                 name
                 agent
                 workspaceDirectory
-                oneShotTurnCommand
+                launchConfigPath
                 ;
             };
             process_match_pattern = discordBridgeProcessMatchPatternFor name;

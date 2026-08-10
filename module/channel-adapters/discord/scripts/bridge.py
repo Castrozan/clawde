@@ -5,6 +5,10 @@ import sys
 
 import discord
 from channel_access import load_access_document, message_is_for_this_agent
+from channel_turn_harness import (
+    record_channel_turn_productivity,
+    resolve_active_one_shot_turn_command,
+)
 from harness_turn import run_one_turn
 
 DISCORD_MESSAGE_CHARACTER_LIMIT = 2000
@@ -33,7 +37,7 @@ class AgentBridgeClient(discord.Client):
     def __init__(
         self,
         agent_name: str,
-        one_shot_turn_command: str,
+        launch_config_path: str,
         workspace_directory: str,
         state_directory: str,
         daily_session_rotation: bool,
@@ -43,7 +47,7 @@ class AgentBridgeClient(discord.Client):
         intents.message_content = True
         super().__init__(intents=intents)
         self.agent_name = agent_name
-        self.one_shot_turn_command = one_shot_turn_command
+        self.launch_config_path = launch_config_path
         self.workspace_directory = workspace_directory
         self.state_directory = state_directory
         self.daily_session_rotation = daily_session_rotation
@@ -65,13 +69,33 @@ class AgentBridgeClient(discord.Client):
             return
         async with self.turn_lock:
             async with message.channel.typing():
+                active_harness_name, one_shot_turn_command = (
+                    resolve_active_one_shot_turn_command(self.launch_config_path)
+                )
+                if one_shot_turn_command is None:
+                    log(
+                        self.agent_name,
+                        f"active harness {active_harness_name} has no one-shot "
+                        "turn command to answer Discord with",
+                    )
+                    await message.channel.send(
+                        f"{self.agent_name} cannot answer turns on "
+                        f"{active_harness_name}."
+                    )
+                    return
                 reply, failure = await asyncio.to_thread(
                     run_one_turn,
-                    self.one_shot_turn_command,
+                    one_shot_turn_command,
                     self.workspace_directory,
                     self.state_directory,
                     message.clean_content,
                     self.daily_session_rotation,
+                )
+                record_channel_turn_productivity(
+                    self.launch_config_path,
+                    self.agent_name,
+                    active_harness_name,
+                    turn_was_productive=bool(reply),
                 )
         if not reply:
             log(self.agent_name, f"turn produced no reply: {failure[:400]}")
@@ -92,7 +116,7 @@ def parse_arguments() -> argparse.Namespace:
         "posts the reply back.",
     )
     parser.add_argument("--agent-name", required=True)
-    parser.add_argument("--one-shot-turn-command", required=True)
+    parser.add_argument("--launch-config", required=True)
     parser.add_argument("--workspace-directory", required=True)
     parser.add_argument("--state-directory", required=True)
     parser.add_argument(
@@ -114,7 +138,7 @@ def main() -> None:
         )
     AgentBridgeClient(
         arguments.agent_name,
-        arguments.one_shot_turn_command,
+        arguments.launch_config,
         arguments.workspace_directory,
         arguments.state_directory,
         arguments.daily_session_rotation,
