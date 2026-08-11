@@ -171,7 +171,6 @@ module/
   instructions/        runtime instruction markdown injected into agents
   scripts/             python/bash runtime: agent-wrapper, heartbeat, clawde-service
     tests/             pytest suites mirroring the runtime scripts
-  snippets/            reusable instruction fragments
 ```
 
 The `options/` -> `lib/` -> `config/` split is the spine: `options/` declares the interface,
