@@ -26,7 +26,6 @@ clawde is a private Nix flake that provides a home-manager module for declarativ
   - `peer-adapters/a2a/` - Agent-to-agent coordination adapter.
   - `peer-adapters/a2a/a2a_server/tests/` - A2A server unit tests.
   - `instructions/` - Agent instruction templates and system prompts.
-  - `snippets/` - Code/config snippets for reference and reuse.
 
 ## Build, Test, and Lint
 
