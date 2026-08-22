@@ -128,6 +128,11 @@ def run_one_turn(
     prompt: str,
     daily_session_rotation: bool = False,
 ) -> tuple[str, str]:
+    """Run one channel turn and return its reply and failure text.
+
+    An empty failure with an empty reply means the harness completed the turn
+    and deliberately sent nothing, which the caller must keep silent.
+    """
     rotate_the_channel_session_if_needed(state_directory, daily_session_rotation)
     resuming = (
         a_previous_turn_is_resumable(state_directory)
@@ -159,5 +164,9 @@ def run_one_turn(
         remember_that_a_turn_completed(state_directory)
         write_channel_session_last_turn_date(state_directory, time.strftime("%Y-%m-%d"))
         return reply, ""
+    if completed_turn.returncode == 0:
+        remember_that_a_turn_completed(state_directory)
+        write_channel_session_last_turn_date(state_directory, time.strftime("%Y-%m-%d"))
+        return "", ""
     forget_the_channel_session(state_directory)
     return "", (completed_turn.stderr or completed_turn.stdout).strip()

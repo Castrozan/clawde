@@ -99,9 +99,10 @@ class AgentBridgeClient(discord.Client):
                 )
         if not reply:
             log(self.agent_name, f"turn produced no reply: {failure[:400]}")
-            await message.channel.send(
-                f"{self.agent_name} could not answer that turn. Its log has the detail."
-            )
+            if failure:
+                await message.channel.send(
+                    f"{self.agent_name} could not answer that turn. Its log has the detail."
+                )
             return
         for sendable_message in split_into_sendable_messages(reply):
             await message.channel.send(sendable_message)
