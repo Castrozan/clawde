@@ -1,10 +1,12 @@
 import json
 import os
 import subprocess
+import time
 
 from pane_content import HeartbeatMultiplexerBackend
 
 CAPTURE_LINE_COUNT = 10
+DELAY_BETWEEN_TYPING_INPUT_AND_PRESSING_ENTER_SECONDS = 0.25
 HERDR_PANE_ID_ENVIRONMENT_VARIABLE = "HERDR_PANE_ID"
 REPORTED_AGENT_STATES_THAT_FORBID_TYPING = ("working", "blocked")
 
@@ -117,6 +119,7 @@ class HerdrHeartbeatBackend(HeartbeatMultiplexerBackend):
         )
         if send_text_result.returncode != 0:
             return False
+        time.sleep(DELAY_BETWEEN_TYPING_INPUT_AND_PRESSING_ENTER_SECONDS)
         enter_result = run_herdr_command(
             "pane", "send-keys", pane_handle.pane_id, "Enter"
         )

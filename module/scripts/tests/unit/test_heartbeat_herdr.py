@@ -106,20 +106,29 @@ def test_capture_uses_visible_source(monkeypatch):
     )
 
 
-def test_send_prompt_writes_text_then_enter(monkeypatch):
-    recorded = []
+def test_send_prompt_waits_for_text_to_settle_before_enter(monkeypatch):
+    events = []
 
     def fake_run(*arguments):
-        recorded.append(arguments)
+        events.append(("run", arguments))
         return _CompletedProcessStub(0, "")
 
     monkeypatch.setattr(herdr_module, "run_herdr_command", fake_run)
+    monkeypatch.setattr(
+        herdr_module.time,
+        "sleep",
+        lambda seconds: events.append(("sleep", seconds)),
+    )
     backend = herdr_module.HerdrHeartbeatBackend()
     handle = herdr_module.HerdrPaneHandle("wP:p7")
     assert backend.send_prompt_to_pane(handle, "wake up")
-    assert recorded == [
-        ("pane", "send-text", "wP:p7", "wake up"),
-        ("pane", "send-keys", "wP:p7", "Enter"),
+    assert events == [
+        ("run", ("pane", "send-text", "wP:p7", "wake up")),
+        (
+            "sleep",
+            herdr_module.DELAY_BETWEEN_TYPING_INPUT_AND_PRESSING_ENTER_SECONDS,
+        ),
+        ("run", ("pane", "send-keys", "wP:p7", "Enter")),
     ]
 
 
