@@ -6,6 +6,10 @@ class StubDiscordException(Exception):
     pass
 
 
+class StubDiscordHTTPException(StubDiscordException):
+    pass
+
+
 class StubDiscordFile:
     def __init__(self, path):
         self.path = path
@@ -19,6 +23,7 @@ def install_discord_stub():
         "Intents", (), {"default": staticmethod(lambda: object())}
     )
     discord_stub.DiscordException = StubDiscordException
+    discord_stub.HTTPException = StubDiscordHTTPException
     discord_stub.File = StubDiscordFile
     sys.modules["discord"] = discord_stub
     return discord_stub

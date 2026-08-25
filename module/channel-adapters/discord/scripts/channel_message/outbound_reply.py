@@ -75,12 +75,27 @@ def split_reply_into_text_and_attachments(
     )
 
 
-async def send_reply(channel, split: ReplyAttachmentSplit) -> None:
-    sendable_messages = split_into_sendable_messages(split.text)
-    attachments = [discord.File(path) for path in split.attachment_paths]
-    leading_message = sendable_messages[0] if sendable_messages else None
-    if leading_message is None and not attachments:
+async def send_leading_message(channel, leading_message, attachment_paths, report):
+    if not attachment_paths:
+        await channel.send(leading_message)
         return
-    await channel.send(leading_message, files=attachments or None)
+    try:
+        await channel.send(
+            leading_message, files=[discord.File(path) for path in attachment_paths]
+        )
+    except discord.HTTPException as sending_failure:
+        report(
+            f"discord refused {len(attachment_paths)} attachments: {sending_failure}"
+        )
+        if leading_message is not None:
+            await channel.send(leading_message)
+
+
+async def send_reply(channel, split: ReplyAttachmentSplit, report) -> None:
+    sendable_messages = split_into_sendable_messages(split.text)
+    leading_message = sendable_messages[0] if sendable_messages else None
+    if leading_message is None and not split.attachment_paths:
+        return
+    await send_leading_message(channel, leading_message, split.attachment_paths, report)
     for sendable_message in sendable_messages[1:]:
         await channel.send(sendable_message)
