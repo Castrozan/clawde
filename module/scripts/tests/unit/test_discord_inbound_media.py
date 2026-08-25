@@ -1,6 +1,5 @@
 import asyncio
 import os
-import time
 
 from discord_stub_test_support import install_discord_stub
 
@@ -162,17 +161,3 @@ def test_a_plain_text_message_reaches_the_agent_unchanged(tmp_path):
 
     assert prompt == "bom dia"
     assert not os.path.exists(str(tmp_path / "inbox"))
-
-
-def test_inbox_directories_older_than_the_retention_window_are_pruned(tmp_path):
-    expired_directory = tmp_path / "inbox" / "1"
-    kept_directory = tmp_path / "inbox" / "2"
-    expired_directory.mkdir(parents=True)
-    kept_directory.mkdir(parents=True)
-    now = time.time()
-    os.utime(expired_directory, (now - inbound_media.INBOX_RETENTION_SECONDS - 1,) * 2)
-
-    inbound_media.prune_expired_inbox(str(tmp_path), now)
-
-    assert not expired_directory.exists()
-    assert kept_directory.exists()

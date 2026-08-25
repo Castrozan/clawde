@@ -1,20 +1,13 @@
 import dataclasses
 import os
-import re
-import shutil
-import time
 
 import discord
+from channel_message.inbox_retention import prepare_inbox_for_message, safe_file_name
 
 ATTACHMENT_DOWNLOAD_SIZE_LIMIT_BYTES = 25 * 1024 * 1024
-INBOX_DIRECTORY_NAME = "inbox"
-INBOX_RETENTION_SECONDS = 7 * 24 * 60 * 60
 MEDIA_BLOCK_OPENING_TAG = "<discord-media>"
 MEDIA_BLOCK_CLOSING_TAG = "</discord-media>"
 DOWNLOAD_FAILED_REASON = "download failed"
-UNSAFE_FILE_NAME_CHARACTERS = re.compile(r"[^A-Za-z0-9._-]")
-LONGEST_KEPT_FILE_NAME = 96
-FALLBACK_FILE_NAME = "attachment"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -22,24 +15,6 @@ class AttachmentIntake:
     attachment: object
     destination_path: str | None
     description_line: str
-
-
-def inbox_directory(state_directory: str) -> str:
-    return os.path.join(state_directory, INBOX_DIRECTORY_NAME)
-
-
-def message_inbox_directory(state_directory: str, message_identifier: str) -> str:
-    return os.path.join(
-        inbox_directory(state_directory), safe_file_name(message_identifier)
-    )
-
-
-def safe_file_name(file_name: str) -> str:
-    sanitized = UNSAFE_FILE_NAME_CHARACTERS.sub("_", file_name).lstrip(".")
-    if len(sanitized) > LONGEST_KEPT_FILE_NAME:
-        stem, extension = os.path.splitext(sanitized)
-        sanitized = stem[: LONGEST_KEPT_FILE_NAME - len(extension)] + extension
-    return sanitized or FALLBACK_FILE_NAME
 
 
 def human_readable_size(byte_count: int) -> str:
@@ -113,25 +88,6 @@ def prompt_for_message(text: str, description_lines: list[str]) -> str:
     if not text.strip():
         return media_block
     return f"{text}\n\n{media_block}"
-
-
-def prune_expired_inbox(state_directory: str, now: float) -> None:
-    cutoff = now - INBOX_RETENTION_SECONDS
-    try:
-        message_directories = os.scandir(inbox_directory(state_directory))
-    except OSError:
-        return
-    with message_directories:
-        for entry in message_directories:
-            if entry.is_dir() and entry.stat().st_mtime < cutoff:
-                shutil.rmtree(entry.path, ignore_errors=True)
-
-
-def prepare_inbox_for_message(state_directory: str, message_identifier: str) -> str:
-    prune_expired_inbox(state_directory, time.time())
-    destination_directory = message_inbox_directory(state_directory, message_identifier)
-    os.makedirs(destination_directory, exist_ok=True)
-    return destination_directory
 
 
 async def save_attachments(attachments, state_directory, message_identifier, report):
