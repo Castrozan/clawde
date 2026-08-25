@@ -118,21 +118,29 @@ class HerdrSupervisorBackend(HerdrQueryOperations, SupervisorMultiplexerBackend)
             return False
         return self.run_wrapper_in_pane(pane_id, wrapper_command)
 
+    def discard_superseded_tab(
+        self, session_name: str, agent_name: str, tab_id: str
+    ) -> None:
+        close_result = self.run_herdr_command("tab", "close", tab_id)
+        if close_result.returncode == 0:
+            return
+        print(
+            f"Error: failed to close the superseded herdr tab {tab_id!r} of "
+            f"{agent_name!r} in workspace {session_name!r}: "
+            f"{close_result.stderr.strip()}",
+            file=sys.stderr,
+        )
+
     def relaunch_wrapper_in_window(
         self, session_name: str, agent_name: str, wrapper_command: str
     ) -> bool:
-        tab = self.find_agent_tab(session_name, agent_name)
-        if tab is None:
+        superseded_tab = self.find_agent_tab(session_name, agent_name)
+        if superseded_tab is None:
             return self.create_agent_window(session_name, agent_name, wrapper_command)
-        close_result = self.run_herdr_command("tab", "close", tab["tab_id"])
-        if close_result.returncode != 0:
-            print(
-                f"Error: failed to replace herdr tab {agent_name!r} in workspace "
-                f"{session_name!r}: {close_result.stderr.strip()}",
-                file=sys.stderr,
-            )
+        if not self.create_agent_window(session_name, agent_name, wrapper_command):
             return False
-        return self.create_agent_window(session_name, agent_name, wrapper_command)
+        self.discard_superseded_tab(session_name, agent_name, superseded_tab["tab_id"])
+        return True
 
     def ensure_host_ready(self, session_name: str) -> bool:
         if not self.ensure_server_running():
