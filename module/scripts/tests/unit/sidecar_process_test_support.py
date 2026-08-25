@@ -23,6 +23,11 @@ def make_sidecar_specification_with_lifetime(tmp_path, lifetime, enabled=True):
     }
 
 
+def record_the_sidecar_as_launched_from_its_current_command(specification):
+    sidecar_process_reconcile.record_spawned_command(specification)
+    return specification
+
+
 def make_session_specification(tmp_path):
     return {
         "name": "clawde",
@@ -53,5 +58,10 @@ def record_process_lookups(monkeypatch, live_process_ids):
         sidecar_process_reconcile,
         "terminate_sidecar_process",
         terminated_process_ids.append,
+    )
+    monkeypatch.setattr(
+        sidecar_process_reconcile,
+        "wait_for_process_to_exit",
+        lambda _process_id: None,
     )
     return spawned_specifications, terminated_process_ids
