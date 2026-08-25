@@ -60,6 +60,7 @@ let
   );
 
   clawdeSupervisorRefresh = pkgs.writeShellScriptBin "clawde-supervisor-refresh" ''
+    export PATH=${clawdeRuntimePaths}
     exec ${pkgs.python312}/bin/python3 ${../scripts/clawde-supervisor-refresh.py} \
       --deployed-command-file ${clawdeServiceDeployedCommandFile} \
       --restart-command ${lib.escapeShellArg clawdeServiceRestartCommand} "$@"

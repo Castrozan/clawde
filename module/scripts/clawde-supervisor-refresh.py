@@ -5,27 +5,28 @@ import subprocess
 SUPERVISOR_PROCESS_MATCH_PATTERN = "clawde-service.py --specification-file"
 
 
+def inspect_processes(command: list[str]) -> str:
+    try:
+        return subprocess.run(command, capture_output=True, text=True).stdout
+    except OSError:
+        return ""
+
+
 def find_supervisor_process_ids() -> list[int]:
-    pgrep_result = subprocess.run(
-        ["pgrep", "-f", SUPERVISOR_PROCESS_MATCH_PATTERN],
-        capture_output=True,
-        text=True,
-    )
     own_process_id = os.getpid()
     return [
         int(line)
-        for line in pgrep_result.stdout.split()
+        for line in inspect_processes(
+            ["pgrep", "-f", SUPERVISOR_PROCESS_MATCH_PATTERN]
+        ).split()
         if line.strip().isdigit() and int(line) != own_process_id
     ]
 
 
 def read_full_command_line(process_id: int) -> str:
-    ps_result = subprocess.run(
-        ["ps", "-ww", "-o", "command=", "-p", str(process_id)],
-        capture_output=True,
-        text=True,
-    )
-    return ps_result.stdout.strip()
+    return inspect_processes(
+        ["ps", "-ww", "-o", "command=", "-p", str(process_id)]
+    ).strip()
 
 
 def read_deployed_command(deployed_command_file: str) -> str:

@@ -57,14 +57,24 @@ def test_an_unreadable_command_line_never_triggers_a_restart(monkeypatch):
 
 
 def test_the_refresh_never_matches_its_own_process(monkeypatch):
-    class PgrepResult:
-        stdout = f"{__import__('os').getpid()}\n"
-
     monkeypatch.setattr(
-        supervisor_refresh.subprocess, "run", lambda *a, **k: PgrepResult()
+        supervisor_refresh,
+        "inspect_processes",
+        lambda _command: f"{__import__('os').getpid()}\n",
     )
 
     assert supervisor_refresh.find_supervisor_process_ids() == []
+
+
+def test_a_missing_process_tool_never_breaks_the_activation(monkeypatch):
+    def raise_missing_tool(*_args, **_keywords):
+        raise FileNotFoundError(2, "No such file or directory", "pgrep")
+
+    monkeypatch.setattr(supervisor_refresh.subprocess, "run", raise_missing_tool)
+
+    assert supervisor_refresh.find_supervisor_process_ids() == []
+    assert supervisor_refresh.read_full_command_line(4321) == ""
+    assert not supervisor_refresh.supervisor_runs_superseded_code(DEPLOYED_COMMAND)
 
 
 def test_the_deployed_command_is_read_from_its_file(tmp_path):
