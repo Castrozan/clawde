@@ -14,6 +14,7 @@ from sidecar_process_test_support import (
     make_sidecar_specification_with_lifetime,
     make_session_specification,
     record_process_lookups,
+    record_the_sidecar_as_launched_from_its_current_command,
 )
 
 
@@ -35,7 +36,10 @@ def test_a_live_sidecar_is_never_relaunched(tmp_path, monkeypatch):
     )
 
     sidecar_process_reconcile.reconcile_one_sidecar_process(
-        make_sidecar_specification(tmp_path), True
+        record_the_sidecar_as_launched_from_its_current_command(
+            make_sidecar_specification(tmp_path)
+        ),
+        True,
     )
 
     assert spawned_specifications == []
@@ -50,7 +54,10 @@ def test_duplicate_sidecar_processes_are_culled_down_to_the_oldest(
     )
 
     sidecar_process_reconcile.reconcile_one_sidecar_process(
-        make_sidecar_specification(tmp_path), True
+        record_the_sidecar_as_launched_from_its_current_command(
+            make_sidecar_specification(tmp_path)
+        ),
+        True,
     )
 
     assert terminated_process_ids == [450, 700]
@@ -175,7 +182,9 @@ def test_a_service_lifetime_sidecar_survives_its_agents_dormancy(tmp_path, monke
     spawned_specifications, terminated_process_ids = record_process_lookups(
         monkeypatch, [4321]
     )
-    specification = make_sidecar_specification_with_lifetime(tmp_path, "service")
+    specification = record_the_sidecar_as_launched_from_its_current_command(
+        make_sidecar_specification_with_lifetime(tmp_path, "service")
+    )
 
     sidecar_process_reconcile.reconcile_one_sidecar_process(
         specification,
