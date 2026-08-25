@@ -9,24 +9,14 @@ from channel_turn_harness import (
     record_channel_turn_productivity,
     resolve_active_one_shot_turn_command,
 )
+from channel_message.inbound_media import prompt_for_message_with_media
+from channel_message.outbound_reply import (
+    send_reply,
+    split_reply_into_text_and_attachments,
+)
 from harness_turn import run_one_turn
 
-DISCORD_MESSAGE_CHARACTER_LIMIT = 2000
 BOT_TOKEN_ENVIRONMENT_VARIABLE = "DISCORD_BOT_TOKEN"
-
-
-def split_into_sendable_messages(reply: str) -> list[str]:
-    remaining = reply
-    messages = []
-    while len(remaining) > DISCORD_MESSAGE_CHARACTER_LIMIT:
-        split_position = remaining.rfind("\n", 0, DISCORD_MESSAGE_CHARACTER_LIMIT)
-        if split_position <= 0:
-            split_position = DISCORD_MESSAGE_CHARACTER_LIMIT
-        messages.append(remaining[:split_position])
-        remaining = remaining[split_position:].lstrip("\n")
-    if remaining:
-        messages.append(remaining)
-    return messages
 
 
 def log(agent_name: str, message: str) -> None:
@@ -83,12 +73,17 @@ class AgentBridgeClient(discord.Client):
                         f"{active_harness_name}."
                     )
                     return
+                prompt = await prompt_for_message_with_media(
+                    message,
+                    self.state_directory,
+                    lambda note: log(self.agent_name, note),
+                )
                 reply, failure = await asyncio.to_thread(
                     run_one_turn,
                     one_shot_turn_command,
                     self.workspace_directory,
                     self.state_directory,
-                    message.clean_content,
+                    prompt,
                     self.daily_session_rotation,
                 )
                 record_channel_turn_productivity(
@@ -104,8 +99,10 @@ class AgentBridgeClient(discord.Client):
                     f"{self.agent_name} could not answer that turn. Its log has the detail."
                 )
             return
-        for sendable_message in split_into_sendable_messages(reply):
-            await message.channel.send(sendable_message)
+        split = split_reply_into_text_and_attachments(reply, self.workspace_directory)
+        for refused_path in split.refused_paths:
+            log(self.agent_name, f"refused to attach {refused_path}")
+        await send_reply(message.channel, split)
 
 
 def parse_arguments() -> argparse.Namespace:

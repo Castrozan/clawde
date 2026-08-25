@@ -2,9 +2,9 @@ import importlib.util
 import pathlib
 import subprocess
 import sys
-import types
 
 import harness_turn
+from discord_stub_test_support import install_discord_stub
 
 OPENCODE_SCRIPTS_DIRECTORY = (
     pathlib.Path(__file__).resolve().parent.parent.parent.parent
@@ -206,13 +206,7 @@ def test_a_timed_out_turn_clears_the_channel_session_and_reports_a_failure(
 
 
 def load_bridge_module_with_stubbed_discord():
-    discord_stub = types.ModuleType("discord")
-    discord_stub.Client = type("Client", (), {})
-    discord_stub.Message = object
-    discord_stub.Intents = type(
-        "Intents", (), {"default": staticmethod(lambda: object())}
-    )
-    sys.modules["discord"] = discord_stub
+    install_discord_stub()
     return load_module_from_path("bridge", DISCORD_SCRIPTS_DIRECTORY / "bridge.py")
 
 
