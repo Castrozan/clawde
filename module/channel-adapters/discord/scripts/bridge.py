@@ -78,6 +78,12 @@ class AgentBridgeClient(discord.Client):
                     self.state_directory,
                     lambda note: log(self.agent_name, note),
                 )
+                if not prompt.strip():
+                    log(
+                        self.agent_name,
+                        f"message {message.id} carried nothing this bridge can render",
+                    )
+                    return
                 reply, failure = await asyncio.to_thread(
                     run_one_turn,
                     one_shot_turn_command,
