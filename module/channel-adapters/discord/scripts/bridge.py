@@ -108,7 +108,9 @@ class AgentBridgeClient(discord.Client):
         split = split_reply_into_text_and_attachments(reply, self.workspace_directory)
         for refused_path in split.refused_paths:
             log(self.agent_name, f"refused to attach {refused_path}")
-        await send_reply(message.channel, split)
+        await send_reply(
+            message.channel, split, lambda note: log(self.agent_name, note)
+        )
 
 
 def parse_arguments() -> argparse.Namespace:

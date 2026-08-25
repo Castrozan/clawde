@@ -1,7 +1,7 @@
 import asyncio
 import os
 
-from discord_stub_test_support import install_discord_stub
+from discord_stub_test_support import StubDiscordHTTPException, install_discord_stub
 
 install_discord_stub()
 
@@ -9,10 +9,13 @@ from channel_message import outbound_reply  # noqa: E402
 
 
 class RecordingChannel:
-    def __init__(self):
+    def __init__(self, refuse_attachments=False):
+        self.refuse_attachments = refuse_attachments
         self.sent = []
 
     async def send(self, content, files=None):
+        if files and self.refuse_attachments:
+            raise StubDiscordHTTPException("payload too large")
         self.sent.append((content, files))
 
 
@@ -123,6 +126,7 @@ def test_the_files_ride_along_with_the_first_sent_message(tmp_path):
         outbound_reply.send_reply(
             channel,
             outbound_reply.ReplyAttachmentSplit("toma", [gif_path], []),
+            [].append,
         )
     )
 
@@ -141,6 +145,7 @@ def test_a_long_reply_attaches_to_the_first_chunk_only(tmp_path):
         outbound_reply.send_reply(
             channel,
             outbound_reply.ReplyAttachmentSplit(long_text, [gif_path], []),
+            [].append,
         )
     )
 
@@ -155,7 +160,7 @@ def test_a_file_with_no_text_is_sent_without_content(tmp_path):
 
     asyncio.run(
         outbound_reply.send_reply(
-            channel, outbound_reply.ReplyAttachmentSplit("", [gif_path], [])
+            channel, outbound_reply.ReplyAttachmentSplit("", [gif_path], []), [].append
         )
     )
 
@@ -168,7 +173,7 @@ def test_nothing_is_sent_when_the_reply_has_neither_text_nor_files():
 
     asyncio.run(
         outbound_reply.send_reply(
-            channel, outbound_reply.ReplyAttachmentSplit("", [], [])
+            channel, outbound_reply.ReplyAttachmentSplit("", [], []), [].append
         )
     )
 
@@ -185,3 +190,39 @@ def test_a_missing_workspace_path_is_left_in_the_text(tmp_path):
     assert split.attachment_paths == []
     assert split.text == missing_path
     assert not os.path.exists(missing_path)
+
+
+def test_a_reply_survives_when_discord_refuses_its_attachment(tmp_path):
+    gif_path = write_workspace_file(tmp_path, "media/sneer.gif")
+    channel = RecordingChannel(refuse_attachments=True)
+    reported = []
+
+    asyncio.run(
+        outbound_reply.send_reply(
+            channel,
+            outbound_reply.ReplyAttachmentSplit("toma", [gif_path], []),
+            reported.append,
+        )
+    )
+
+    assert channel.sent == [("toma", None)]
+    assert any("payload too large" in note for note in reported)
+
+
+def test_a_refused_lone_attachment_reports_rather_than_sending_an_empty_message(
+    tmp_path,
+):
+    gif_path = write_workspace_file(tmp_path, "media/sneer.gif")
+    channel = RecordingChannel(refuse_attachments=True)
+    reported = []
+
+    asyncio.run(
+        outbound_reply.send_reply(
+            channel,
+            outbound_reply.ReplyAttachmentSplit("", [gif_path], []),
+            reported.append,
+        )
+    )
+
+    assert channel.sent == []
+    assert reported
