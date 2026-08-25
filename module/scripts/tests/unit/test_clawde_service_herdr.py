@@ -4,6 +4,7 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from herdr_backend_test_support import (
+    CompletedProcessStub,
     TAB_CREATE_JSON,
     TAB_LIST_WP,
     TAB_LIST_WP_ONLY_BOOTSTRAP,
@@ -130,7 +131,7 @@ def test_create_agent_window_creates_the_workspace_when_missing():
     ) in issued
 
 
-def test_relaunch_replaces_the_existing_tab_before_starting_the_wrapper():
+def test_relaunch_starts_the_replacement_tab_before_discarding_the_stale_one():
     issued = []
     backend = backend_with_responses(
         issued,
@@ -143,8 +144,7 @@ def test_relaunch_replaces_the_existing_tab_before_starting_the_wrapper():
     assert backend.relaunch_wrapper_in_window(
         "clawde", "bronze", "exec /nix/store/x-agent"
     )
-    assert ("tab", "close", "wP:t7") in issued
-    assert (
+    creation = (
         "tab",
         "create",
         "--workspace",
@@ -152,7 +152,8 @@ def test_relaunch_replaces_the_existing_tab_before_starting_the_wrapper():
         "--label",
         "bronze",
         "--no-focus",
-    ) in issued
+    )
+    assert issued.index(creation) < issued.index(("tab", "close", "wP:t7"))
     assert (
         "pane",
         "run",
@@ -160,6 +161,42 @@ def test_relaunch_replaces_the_existing_tab_before_starting_the_wrapper():
         "CLAWDE_MULTIPLEXER=herdr exec /nix/store/x-agent",
     ) in issued
     assert not any(command[:3] == ("pane", "run", "wP:p7") for command in issued)
+
+
+def test_relaunch_revives_an_agent_whose_tab_is_the_last_one_in_its_workspace():
+    issued = []
+    backend = backend_with_responses(
+        issued,
+        [
+            (("workspace", "list"), WORKSPACE_LIST_WITH_CLAWDE),
+            (("tab", "list", "--workspace"), TAB_LIST_WP),
+            (("tab", "create"), TAB_CREATE_JSON),
+        ],
+    )
+    creating_run = backend.run_herdr_command
+
+    def run_refusing_to_close_the_last_tab(*arguments):
+        if arguments[:2] == ("tab", "close"):
+            issued.append(arguments)
+            refusal = CompletedProcessStub(1, "")
+            refusal.stderr = (
+                '{"error":{"code":"tab_close_failed",'
+                '"message":"cannot close the last tab in a workspace"}}'
+            )
+            return refusal
+        return creating_run(*arguments)
+
+    backend.run_herdr_command = run_refusing_to_close_the_last_tab
+
+    assert backend.relaunch_wrapper_in_window(
+        "clawde", "bronze", "exec /nix/store/x-agent"
+    )
+    assert (
+        "pane",
+        "run",
+        "wZ:p9",
+        "CLAWDE_MULTIPLEXER=herdr exec /nix/store/x-agent",
+    ) in issued
 
 
 def test_remove_agent_window_closes_the_agent_tab():
