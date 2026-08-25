@@ -19,7 +19,7 @@ let
 
   clawdeServiceRestartCommand =
     if pkgs.stdenv.hostPlatform.isLinux then
-      "systemctl --user restart clawde"
+      "systemctl --user daemon-reload && systemctl --user restart clawde"
     else
       "launchctl kickstart -k gui/UID/org.nix-community.home.clawde";
 
@@ -54,6 +54,16 @@ let
     "--specification-file"
     "${clawdeServiceSpecificationFile}"
   ];
+
+  clawdeServiceDeployedCommandFile = pkgs.writeText "clawde-service-deployed-command" (
+    lib.concatStringsSep " " clawdeServiceExecArguments
+  );
+
+  clawdeSupervisorRefresh = pkgs.writeShellScriptBin "clawde-supervisor-refresh" ''
+    exec ${pkgs.python312}/bin/python3 ${../scripts/clawde-supervisor-refresh.py} \
+      --deployed-command-file ${clawdeServiceDeployedCommandFile} \
+      --restart-command ${lib.escapeShellArg clawdeServiceRestartCommand} "$@"
+  '';
 
   linuxSystemdUnit = {
     Unit = {
@@ -118,7 +128,14 @@ in
       clawdeSessionStarter
       clawdeGracefulRedeploy
       clawdeHeartbeatChangeGate
+      clawdeSupervisorRefresh
     ];
+
+    home.activation.refreshClawdeSupervisorWhenItsCodeChanges =
+      lib.hm.dag.entryAfter [ "writeBoundary" ]
+        ''
+          run ${clawdeSupervisorRefresh}/bin/clawde-supervisor-refresh
+        '';
 
     xdg.dataFile."bash-completion/completions/clawde".source = ../scripts/completion/clawde.bash;
 
