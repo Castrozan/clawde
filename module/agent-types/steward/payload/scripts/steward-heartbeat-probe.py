@@ -5,11 +5,8 @@ import sys
 
 DECISION_FINGERPRINT_FIELDS = (
     "verdict",
-    "head",
-    "upstream",
     "behind",
     "ahead",
-    "dirty",
     "inbox_unread",
 )
 
@@ -28,11 +25,15 @@ def collect_steward_status() -> dict:
     return json.loads(completed.stdout)
 
 
+def continuous_integration_is_failing(status: dict) -> bool:
+    return status.get("continuous_integration", {}).get("state") == "failing"
+
+
 def decision_fingerprint(status: dict) -> str:
     relevant = {field: status.get(field) for field in DECISION_FINGERPRINT_FIELDS}
-    relevant["continuous_integration_state"] = status.get(
-        "continuous_integration", {}
-    ).get("state")
+    relevant["continuous_integration_failing"] = continuous_integration_is_failing(
+        status
+    )
     return json.dumps(relevant, sort_keys=True)
 
 

@@ -51,7 +51,7 @@ def test_fingerprint_tracks_decision_fields_not_volatile_detail():
     assert base == same_state_new_url
 
 
-def test_fingerprint_changes_when_continuous_integration_state_flips():
+def test_fingerprint_changes_when_continuous_integration_starts_failing():
     passing = steward_heartbeat_probe.decision_fingerprint(diverged_status())
     failing = steward_heartbeat_probe.decision_fingerprint(
         diverged_status(continuous_integration={"state": "failing", "url": "x"})
@@ -59,14 +59,38 @@ def test_fingerprint_changes_when_continuous_integration_state_flips():
     assert passing != failing
 
 
-def test_fingerprint_changes_when_upstream_moves():
+def test_a_run_moving_through_its_pending_states_raises_no_edge():
+    unfinished = [
+        steward_heartbeat_probe.decision_fingerprint(
+            diverged_status(continuous_integration={"state": state, "url": "x"})
+        )
+        for state in ("none", "pending", "passing")
+    ]
+    assert len(set(unfinished)) == 1
+
+
+def test_a_peer_moving_the_shared_checkout_raises_no_edge():
     before = steward_heartbeat_probe.decision_fingerprint(diverged_status())
     after = steward_heartbeat_probe.decision_fingerprint(
-        diverged_status(upstream="cafef00d")
+        diverged_status(head="cafef00d", upstream="cafef00d", dirty=False)
     )
+    assert before == after
+
+
+def test_fingerprint_changes_when_the_checkout_falls_behind():
+    before = steward_heartbeat_probe.decision_fingerprint(diverged_status(behind=1))
+    after = steward_heartbeat_probe.decision_fingerprint(diverged_status(behind=2))
     assert before != after
+
+
+def test_fingerprint_changes_when_the_inbox_receives_a_message():
+    empty = steward_heartbeat_probe.decision_fingerprint(diverged_status())
+    delivered = steward_heartbeat_probe.decision_fingerprint(
+        diverged_status(inbox_unread=["1787959285-from-rin.json"])
+    )
+    assert empty != delivered
 
 
 def test_fingerprint_is_stable_json(monkeypatch):
     fingerprint = steward_heartbeat_probe.decision_fingerprint(diverged_status())
-    assert json.loads(fingerprint)["continuous_integration_state"] == "passing"
+    assert json.loads(fingerprint)["continuous_integration_failing"] is False
