@@ -95,6 +95,11 @@ forAllSystems (
       lib.concatStringsSep "\n" (map checkAssertion discordTransportFixture.assertions) + "\ntouch $out"
     );
 
+    codex-one-shot-execution = import ../module/tests/codex-one-shot-execution/check.nix {
+      inherit pkgs lib;
+      module = self.homeManagerModules.clawde;
+    };
+
     formatting =
       pkgs.runCommand "clawde-formatting"
         {

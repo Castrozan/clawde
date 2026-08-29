@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": ["silence", "reply"]
+    },
+    "text": {
+      "type": "string"
+    }
+  },
+  "required": ["action", "text"],
+  "additionalProperties": false
+}
