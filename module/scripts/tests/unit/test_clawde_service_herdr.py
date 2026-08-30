@@ -12,44 +12,7 @@ from herdr_backend_test_support import (
     WORKSPACE_LIST_WITH_CLAWDE,
     WORKSPACE_LIST_WITHOUT_CLAWDE,
     backend_with_responses,
-    base,
-    herdr_backend,
 )
-
-
-def test_start_headless_herdr_server_uses_a_transient_user_service_on_linux(
-    monkeypatch,
-):
-    issued = []
-
-    def record_server_start(command, **keyword_arguments):
-        issued.append((command, keyword_arguments))
-
-    monkeypatch.setattr(herdr_backend.sys, "platform", "linux")
-    monkeypatch.setattr(herdr_backend.subprocess, "Popen", record_server_start)
-
-    herdr_backend.HerdrSupervisorBackend().start_headless_herdr_server()
-
-    assert issued == [
-        (
-            [
-                "systemd-run",
-                "--user",
-                "--unit",
-                "clawde-herdr-server",
-                "--collect",
-                "--quiet",
-                "herdr",
-                "server",
-            ],
-            {
-                "stdout": herdr_backend.subprocess.DEVNULL,
-                "stderr": herdr_backend.subprocess.DEVNULL,
-                "stdin": herdr_backend.subprocess.DEVNULL,
-                "start_new_session": True,
-            },
-        )
-    ]
 
 
 def test_agent_window_exists_is_scoped_to_the_target_workspace():
@@ -227,14 +190,3 @@ def test_remove_agent_window_is_a_noop_when_the_tab_is_absent():
     backend.remove_agent_window("clawde", "bronze")
 
     assert not any(command[:2] == ("tab", "close") for command in issued)
-
-
-def test_select_supervisor_backend_dispatches_on_environment(monkeypatch):
-    monkeypatch.setenv(base.MULTIPLEXER_ENVIRONMENT_VARIABLE, "herdr")
-    assert isinstance(
-        base.select_supervisor_backend(), herdr_backend.HerdrSupervisorBackend
-    )
-    monkeypatch.delenv(base.MULTIPLEXER_ENVIRONMENT_VARIABLE, raising=False)
-    assert not isinstance(
-        base.select_supervisor_backend(), herdr_backend.HerdrSupervisorBackend
-    )

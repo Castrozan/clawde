@@ -1,6 +1,4 @@
-import subprocess
 import sys
-import time
 
 from herdr_query_operations import HerdrQueryOperations
 from supervisor_backend_base import (
@@ -8,44 +6,16 @@ from supervisor_backend_base import (
     SupervisorMultiplexerBackend,
 )
 
-HERDR_SERVER_STARTUP_WAIT_ATTEMPTS = 30
-HERDR_SERVER_STARTUP_WAIT_DELAY_SECONDS = 0.5
 HERDR_MULTIPLEXER_ENVIRONMENT_VALUE = "herdr"
 HERDR_DEFAULT_WORKSPACE_TAB_LABEL = "1"
-HERDR_SERVER_SYSTEMD_UNIT_NAME = "clawde-herdr-server"
 
 
 class HerdrSupervisorBackend(HerdrQueryOperations, SupervisorMultiplexerBackend):
-    def start_headless_herdr_server(self) -> None:
-        server_command = ["herdr", "server"]
-        if sys.platform == "linux":
-            server_command = [
-                "systemd-run",
-                "--user",
-                "--unit",
-                HERDR_SERVER_SYSTEMD_UNIT_NAME,
-                "--collect",
-                "--quiet",
-                *server_command,
-            ]
-        subprocess.Popen(
-            server_command,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            stdin=subprocess.DEVNULL,
-            start_new_session=True,
-        )
-
     def ensure_server_running(self) -> bool:
         if self.herdr_server_is_running():
             return True
-        self.start_headless_herdr_server()
-        for _ in range(HERDR_SERVER_STARTUP_WAIT_ATTEMPTS):
-            if self.herdr_server_is_running():
-                return True
-            time.sleep(HERDR_SERVER_STARTUP_WAIT_DELAY_SECONDS)
         print(
-            "Error: herdr server did not come up after starting it headlessly",
+            "Error: herdr server must be managed independently and is unavailable",
             file=sys.stderr,
         )
         return False
