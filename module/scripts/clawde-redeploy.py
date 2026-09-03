@@ -10,6 +10,7 @@ from agent_wrapper_processes import (
     parse_agent_wrapper_command_line,
     read_full_command_line,
 )
+from harness_runtime_profile import load_harness_runtime_profile_from_launch_config
 
 GRACE_DELAY_SECONDS_BEFORE_SIGNALING = 2
 REDEPLOY_LOG_RELATIVE_PATH = "Library/Logs/clawde-redeploy.log"
@@ -80,9 +81,21 @@ def select_wrappers_with_in_flight_work_before_restart(
         pane_handle = heartbeat_backend.prepare_pane_handle(
             agent_wrapper["tmux_session"], agent_wrapper["agent_name"]
         )
-        if pane_handle is None or not heartbeat_backend.pane_is_idle(pane_handle):
+        if pane_handle is None or not pane_is_idle_for_wrapper(
+            heartbeat_backend, pane_handle, agent_wrapper
+        ):
             wrappers_with_in_flight_work.append(agent_wrapper)
     return wrappers_with_in_flight_work
+
+
+def pane_is_idle_for_wrapper(heartbeat_backend, pane_handle, agent_wrapper) -> bool:
+    try:
+        harness_runtime_profile = load_harness_runtime_profile_from_launch_config(
+            agent_wrapper["config_file_path"]
+        )
+    except (KeyError, OSError, ValueError):
+        return False
+    return heartbeat_backend.pane_is_idle(pane_handle, harness_runtime_profile)
 
 
 def spawn_resume_nudges(agent_wrappers: list[dict]) -> None:
