@@ -6,7 +6,7 @@ from harness_productivity_record import (
 )
 from session_persistence import session_transcript_file
 from session_store import build_session_record_file_path, read_persisted_session_record
-from transcript_productivity import count_non_api_error_transcript_entries
+from transcript_productivity import count_transcript_assistant_work_entries
 
 ACTIVE_WORK_SAMPLE_COUNT = 6
 ACTIVE_WORK_SAMPLE_INTERVAL_SECONDS = 5
@@ -19,7 +19,7 @@ def live_session_identifier(runtime_root_directory: str, agent_name: str) -> str
     return persisted_session_identifier
 
 
-def session_transcript_entry_count(
+def session_transcript_work_entry_count(
     harness_runtime_profile,
     session_identifier: str | None,
     workspace_directory: str | None,
@@ -28,7 +28,7 @@ def session_transcript_entry_count(
         return None
     if not harness_runtime_profile.exposes_session_transcript_store():
         return None
-    return count_non_api_error_transcript_entries(
+    return count_transcript_assistant_work_entries(
         session_transcript_file(
             harness_runtime_profile, session_identifier, workspace_directory
         )
@@ -57,7 +57,7 @@ class DeliveredTurnObserver:
         return judge_previous_turn_and_baseline_the_next(
             self.record_file_path,
             session_identifier,
-            session_transcript_entry_count(
+            session_transcript_work_entry_count(
                 self.harness_runtime_profile,
                 session_identifier,
                 self.workspace_directory,
