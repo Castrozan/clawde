@@ -6,10 +6,10 @@ from harness_productivity_record import (
 )
 from session_persistence import session_transcript_file
 from session_store import build_session_record_file_path, read_persisted_session_record
+from transcript_productivity import count_non_api_error_transcript_entries
 
 ACTIVE_WORK_SAMPLE_COUNT = 6
 ACTIVE_WORK_SAMPLE_INTERVAL_SECONDS = 5
-TRANSCRIPT_READ_CHUNK_BYTES = 1024 * 1024
 
 
 def live_session_identifier(runtime_root_directory: str, agent_name: str) -> str | None:
@@ -17,17 +17,6 @@ def live_session_identifier(runtime_root_directory: str, agent_name: str) -> str
         build_session_record_file_path(runtime_root_directory, agent_name)
     )
     return persisted_session_identifier
-
-
-def count_lines_in_file(file_path) -> int | None:
-    try:
-        with open(file_path, "rb") as open_file:
-            line_count = 0
-            while chunk := open_file.read(TRANSCRIPT_READ_CHUNK_BYTES):
-                line_count += chunk.count(b"\n")
-        return line_count
-    except OSError:
-        return None
 
 
 def session_transcript_entry_count(
@@ -39,7 +28,7 @@ def session_transcript_entry_count(
         return None
     if not harness_runtime_profile.exposes_session_transcript_store():
         return None
-    return count_lines_in_file(
+    return count_non_api_error_transcript_entries(
         session_transcript_file(
             harness_runtime_profile, session_identifier, workspace_directory
         )

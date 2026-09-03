@@ -43,13 +43,19 @@ def begin_harness_productivity_record(
     now: datetime.datetime | None = None,
 ) -> None:
     previous_record = read_harness_productivity_record(record_file_path)
+    session_started_at = (now or datetime.datetime.now()).isoformat()
+    if previous_record.get("harness") == harness_name:
+        previous_record["session_started_at"] = session_started_at
+        write_harness_productivity_record(record_file_path, previous_record)
+        return
     write_harness_productivity_record(
         record_file_path,
         {
             "harness": harness_name,
             "consecutive_unproductive_turns": 0,
-            "session_started_at": (now or datetime.datetime.now()).isoformat(),
+            "session_started_at": session_started_at,
             "last_productive_turn_at": previous_record.get("last_productive_turn_at"),
+            "delivered_turn_pending": False,
             "delivered_turn_session_identifier": None,
             "delivered_turn_transcript_entry_count": None,
             "delivered_turn_showed_active_work": False,
@@ -100,17 +106,49 @@ def judge_previous_turn_and_baseline_the_next(
     transcript_entry_count: int | None,
     now: datetime.datetime | None = None,
 ) -> dict:
+    judge_pending_delivery(
+        record_file_path, session_identifier, transcript_entry_count, now
+    )
+    return baseline_next_delivery(
+        record_file_path, session_identifier, transcript_entry_count
+    )
+
+
+def baseline_next_delivery(
+    record_file_path: str,
+    session_identifier: str | None,
+    transcript_entry_count: int | None,
+) -> dict:
+    record = read_harness_productivity_record(record_file_path)
+    record["delivered_turn_pending"] = True
+    record["delivered_turn_session_identifier"] = session_identifier
+    record["delivered_turn_transcript_entry_count"] = transcript_entry_count
+    record["delivered_turn_showed_active_work"] = False
+    write_harness_productivity_record(record_file_path, record)
+    return record
+
+
+def judge_pending_delivery(
+    record_file_path: str,
+    session_identifier: str | None,
+    transcript_entry_count: int | None,
+    now: datetime.datetime | None = None,
+) -> dict:
+    record = read_harness_productivity_record(record_file_path)
+    if record.get("delivered_turn_pending") is not True:
+        return record
     judged_record = record_observed_heartbeat_turn(
         record_file_path,
         delivered_turn_produced_work(
-            read_harness_productivity_record(record_file_path),
+            record,
             session_identifier,
             transcript_entry_count,
         ),
         now,
     )
-    judged_record["delivered_turn_session_identifier"] = session_identifier
-    judged_record["delivered_turn_transcript_entry_count"] = transcript_entry_count
+    judged_record["delivered_turn_pending"] = False
+    judged_record["delivered_turn_session_identifier"] = None
+    judged_record["delivered_turn_transcript_entry_count"] = None
     judged_record["delivered_turn_showed_active_work"] = False
     write_harness_productivity_record(record_file_path, judged_record)
     return judged_record

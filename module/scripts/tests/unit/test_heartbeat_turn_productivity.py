@@ -41,6 +41,11 @@ def append_transcript_entries(transcript_file, entry_count):
         open_transcript_file.write('{"entry": "recorded"}\n' * entry_count)
 
 
+def append_transcript_entry(transcript_file, entry):
+    with open(transcript_file, "a") as open_transcript_file:
+        open_transcript_file.write(json.dumps(entry) + "\n")
+
+
 def build_parked_agent(tmp_path, initial_transcript_entry_count=40):
     runtime_root_directory = str(tmp_path / "clawde")
     write_live_session_identifier(runtime_root_directory, SESSION_IDENTIFIER)
@@ -95,6 +100,52 @@ def test_a_transcript_that_never_grew_counts_as_no_work(tmp_path):
         "the delivered prompt left it, which is the only on-disk difference between a "
         "quota-parked agent and a working one"
     )
+
+
+def test_a_prompt_followed_by_an_api_error_counts_as_no_work(tmp_path):
+    observer, record_path, transcript_file = build_parked_agent(tmp_path)
+    observer.judge_previous_delivery()
+    append_transcript_entry(transcript_file, {"type": "user"})
+    append_transcript_entry(
+        transcript_file,
+        {"type": "assistant", "isApiErrorMessage": True},
+    )
+    observer.judge_previous_delivery()
+
+    assert counted_unproductive_turns(record_path) == 1
+
+
+def test_a_prompt_followed_by_a_normal_assistant_response_counts_as_work(tmp_path):
+    observer, record_path, transcript_file = build_parked_agent(tmp_path)
+    observer.judge_previous_delivery()
+    append_transcript_entry(transcript_file, {"type": "user"})
+    append_transcript_entry(
+        transcript_file,
+        {"type": "assistant", "isApiErrorMessage": False},
+    )
+    observer.judge_previous_delivery()
+
+    assert counted_unproductive_turns(record_path) == 0
+
+
+def test_a_tool_using_assistant_turn_counts_as_work(tmp_path):
+    observer, record_path, transcript_file = build_parked_agent(tmp_path)
+    observer.judge_previous_delivery()
+    append_transcript_entry(transcript_file, {"type": "user"})
+    append_transcript_entry(
+        transcript_file,
+        {
+            "type": "assistant",
+            "message": {"content": [{"type": "tool_use"}]},
+        },
+    )
+    append_transcript_entry(
+        transcript_file,
+        {"type": "user", "message": {"content": [{"type": "tool_result"}]}},
+    )
+    observer.judge_previous_delivery()
+
+    assert counted_unproductive_turns(record_path) == 0
 
 
 def test_a_pane_that_reports_its_own_working_state_is_never_read_as_no_work(tmp_path):

@@ -2,10 +2,12 @@ import datetime
 
 from harness_productivity_record import (
     CONSECUTIVE_UNPRODUCTIVE_TURNS_BEFORE_FAILOVER,
+    baseline_next_delivery,
     begin_harness_productivity_record,
     consecutive_unproductive_turns,
     harness_is_refusing_work,
     harness_productivity_record_path,
+    judge_pending_delivery,
     read_harness_productivity_record,
     record_observed_heartbeat_turn,
 )
@@ -90,3 +92,35 @@ def test_beginning_a_session_resets_the_run_but_keeps_the_last_productive_turn(
     assert record["harness"] == "codex"
     assert consecutive_unproductive_turns(record) == 0
     assert record["last_productive_turn_at"] == AT_NOON.isoformat()
+
+
+def test_three_same_harness_restarts_preserve_pending_refusal_evidence(tmp_path):
+    path = record_path(tmp_path)
+    begin_harness_productivity_record(path, "opencode", AT_NOON)
+
+    for _turn in range(CONSECUTIVE_UNPRODUCTIVE_TURNS_BEFORE_FAILOVER):
+        baseline_next_delivery(path, "session-id", 10)
+        begin_harness_productivity_record(path, "opencode", AT_NOON)
+        judge_pending_delivery(path, "session-id", 10, AT_NOON)
+
+    record = read_harness_productivity_record(path)
+    assert harness_is_refusing_work(record, "opencode") is True
+
+
+def test_a_healthy_same_harness_restart_does_not_fabricate_a_refusal(tmp_path):
+    path = record_path(tmp_path)
+    begin_harness_productivity_record(path, "opencode", AT_NOON)
+    begin_harness_productivity_record(path, "opencode", AT_NOON)
+    judge_pending_delivery(path, "session-id", 10, AT_NOON)
+
+    assert consecutive_unproductive_turns(read_harness_productivity_record(path)) == 0
+
+
+def test_a_completed_delivery_survives_a_same_harness_restart(tmp_path):
+    path = record_path(tmp_path)
+    begin_harness_productivity_record(path, "opencode", AT_NOON)
+    baseline_next_delivery(path, "session-id", 10)
+    begin_harness_productivity_record(path, "opencode", AT_NOON)
+    judge_pending_delivery(path, "session-id", 12, AT_NOON)
+
+    assert consecutive_unproductive_turns(read_harness_productivity_record(path)) == 0

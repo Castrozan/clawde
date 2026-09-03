@@ -6,6 +6,10 @@ from active_hours_override import (
     read_override_active_until,
 )
 from agent_log import emit_timestamped_log
+from harness_productivity_record import (
+    harness_productivity_record_path,
+    judge_pending_delivery,
+)
 from launch_gate import run_launch_command_to_completion
 from launch_session import decide_and_persist_launch_session
 from redeploy_signals import register_current_child_process_id
@@ -16,6 +20,7 @@ from restart_scheduling import (
     should_reset_backoff,
 )
 from session_store import forget_session_identifier_from_record
+from transcript_productivity import count_non_api_error_transcript_entries
 from session_watchdog import run_launch_command_once
 
 
@@ -104,6 +109,22 @@ def run_warm_session_iteration(
         heartbeat_driver_log_path=heartbeat_driver_log_path,
         is_resume_launch=launch_session.resume_previous_session,
         reason_to_replace_session=reason_to_replace_session,
+    )
+
+    transcript_entry_count = None
+    if (
+        workspace_directory
+        and harness_runtime_profile.exposes_session_transcript_store()
+    ):
+        transcript_entry_count = count_non_api_error_transcript_entries(
+            harness_runtime_profile.render_session_transcript_path(
+                launch_session.session_identifier, workspace_directory
+            )
+        )
+    judge_pending_delivery(
+        harness_productivity_record_path(runtime_root_directory, agent_name),
+        launch_session.session_identifier,
+        transcript_entry_count,
     )
 
     if resume_session_missing:
