@@ -1,13 +1,16 @@
 import datetime
 
+from harness_productivity_delivery import (
+    baseline_next_delivery,
+    judge_pending_delivery,
+    judge_pending_delivery_after_session_exit,
+)
 from harness_productivity_record import (
     CONSECUTIVE_UNPRODUCTIVE_TURNS_BEFORE_FAILOVER,
-    baseline_next_delivery,
     begin_harness_productivity_record,
     consecutive_unproductive_turns,
     harness_is_refusing_work,
     harness_productivity_record_path,
-    judge_pending_delivery,
     read_harness_productivity_record,
     record_observed_heartbeat_turn,
 )
@@ -124,3 +127,18 @@ def test_a_completed_delivery_survives_a_same_harness_restart(tmp_path):
     judge_pending_delivery(path, "session-id", 12, AT_NOON)
 
     assert consecutive_unproductive_turns(read_harness_productivity_record(path)) == 0
+
+
+def test_three_transcriptless_exits_after_delivery_reach_the_refusal_threshold(
+    tmp_path,
+):
+    path = record_path(tmp_path)
+    begin_harness_productivity_record(path, "opencode", AT_NOON)
+
+    for _turn in range(CONSECUTIVE_UNPRODUCTIVE_TURNS_BEFORE_FAILOVER):
+        baseline_next_delivery(path, "harness-owned-session", None)
+        judge_pending_delivery_after_session_exit(
+            path, "harness-owned-session", None, AT_NOON
+        )
+
+    assert harness_is_refusing_work(read_harness_productivity_record(path), "opencode")
