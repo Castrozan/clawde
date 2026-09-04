@@ -23,6 +23,10 @@ let
     builtins.readFile ../scripts/steward-heartbeat-probe.py
   );
 
+  stewardDeferToRebuildSource = pkgs.writeText "steward-defer-to-rebuild.py" (
+    builtins.readFile ../scripts/steward-defer-to-rebuild.py
+  );
+
   stewardStatus = pkgs.writeShellScriptBin "steward-status" ''
     set -euo pipefail
     export PATH="${pkgs.git}/bin:${pkgs.gh}/bin:${pkgs.coreutils}/bin:''${PATH:+$PATH}"
@@ -46,6 +50,12 @@ let
     export PATH="${pkgs.git}/bin:${pkgs.lib.optionalString pkgs.stdenv.isLinux "${pkgs.systemd}/bin:"}${pkgs.coreutils}/bin:''${PATH:+$PATH}"
     exec ${python}/bin/python3 ${stewardActivateSource} "$@"
   '';
+
+  stewardDeferToRebuild = pkgs.writeShellScriptBin "steward-defer-to-rebuild" ''
+    set -euo pipefail
+    export PATH="${pkgs.lib.optionalString pkgs.stdenv.isLinux "${pkgs.util-linux}/bin:"}''${PATH:+$PATH}"
+    exec ${python}/bin/python3 ${stewardDeferToRebuildSource} "$@"
+  '';
 in
 {
   packages = [
@@ -53,5 +63,6 @@ in
     stewardMessage
     stewardHeartbeatProbe
     stewardActivate
+    stewardDeferToRebuild
   ];
 }

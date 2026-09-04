@@ -34,6 +34,8 @@ This skill is materialized into the nix store from the `clawde` flake input your
 
 <detaching_work_longer_than_a_tick>
 A full validation takes far longer than one tick, and your session is a warm interactive one prodded by a heartbeat, so blocking a tick on a build starves every later heartbeat and freezes all other work: never end a tick on the result of a build it started, detach the run to a log file named after the revision it validates, end the tick, and let a later tick read the sentinel and act. Detach it as a plain background job that survives your process, never by opening a `tmux` session — this fleet's multiplexer is `herdr`, so a `tmux` server here is unsupervised and orphaned, and on darwin a rebuild that swaps tmux's own store path gets the running server killed by the kernel, silently taking an in-flight validation with it. Since the tick that starts a validation is never the tick that pushes, write the terminal outcome under your workspace `state/` keyed by revision the moment it lands, and treat an unconsumed validation result as work owed on your next tick rather than something to re-derive from scratch.
+A detached validation must launch its worker through `steward-defer-to-rebuild`. Never acquire the rebuild lock from
+validation: its lower priority means a later operator rebuild must still start.
 </detaching_work_longer_than_a_tick>
 
 <tick_sequence>
