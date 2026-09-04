@@ -141,6 +141,25 @@ def test_rebuild_starting_during_validation_preempts_and_restarts_it(monkeypatch
     assert terminated_processes == [first_process]
 
 
+def test_terminated_leader_with_surviving_group_is_force_killed(monkeypatch):
+    validation_process = ValidationProcess(4312, [0, 0])
+    delivered_signals = []
+    monkeypatch.setattr(
+        steward_defer_to_rebuild.os,
+        "killpg",
+        lambda process_group_id, delivered_signal: delivered_signals.append(
+            (process_group_id, delivered_signal)
+        ),
+    )
+
+    steward_defer_to_rebuild.terminate_validation_process(validation_process)
+
+    assert delivered_signals == [
+        (4312, steward_defer_to_rebuild.signal.SIGTERM),
+        (4312, steward_defer_to_rebuild.signal.SIGKILL),
+    ]
+
+
 def test_interrupted_guard_terminates_validation_process(monkeypatch):
     validation_process = InterruptedValidationProcess()
     terminated_processes = []

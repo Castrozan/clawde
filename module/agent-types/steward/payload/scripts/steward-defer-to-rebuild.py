@@ -79,11 +79,12 @@ def terminate_validation_process(validation_process):
     try:
         validation_process.wait(timeout=10)
     except subprocess.TimeoutExpired:
-        try:
-            os.killpg(validation_process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        validation_process.wait()
+        pass
+    try:
+        os.killpg(validation_process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    validation_process.wait()
 
 
 def run_validation_with_rebuild_preemption(
