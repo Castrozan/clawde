@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import pathlib
 
 
@@ -83,3 +84,64 @@ def test_enforces_reply_to_newest_discord_message_even_after_earlier_reply():
         _assistant_text("answered the new one in terminal"),
     ]
     assert hook.chat_id_needing_reply(entries, stop_hook_active=False) == "777"
+
+
+def _write_transcript(tmp_path, entries):
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text("".join(json.dumps(entry) + "\n" for entry in entries))
+    return transcript
+
+
+def test_tail_reader_returns_suffix_from_newest_discord_turn(tmp_path):
+    entries = (
+        [_assistant_text(f"old work {index}") for index in range(2000)]
+        + [_user(DISCORD_ENVELOPE)]
+        + [_assistant_text("answered in terminal only")]
+    )
+    transcript = _write_transcript(tmp_path, entries)
+    tail = hook.read_transcript_tail_through_latest_discord_turn(str(transcript))
+    assert len(tail) == 2
+    assert hook.user_entry_carries_discord_envelope(tail[0])
+    assert hook.chat_id_needing_reply(tail, stop_hook_active=False) == "555"
+
+
+def test_tail_reader_decision_matches_full_parse_when_reply_present(tmp_path):
+    entries = (
+        [_assistant_text(f"old work {index}") for index in range(500)]
+        + [_user(DISCORD_ENVELOPE)]
+        + [_assistant_reply("555")]
+    )
+    transcript = _write_transcript(tmp_path, entries)
+    tail = hook.read_transcript_tail_through_latest_discord_turn(str(transcript))
+    assert hook.chat_id_needing_reply(tail, stop_hook_active=False) is None
+
+
+def test_tail_reader_ignores_older_unanswered_discord_turn(tmp_path):
+    entries = [
+        _user(DISCORD_ENVELOPE),
+        _assistant_text("never answered the old one"),
+        _user(
+            '<channel source="plugin:discord:discord" chat_id="777" '
+            'message_id="2" user="user1" ts="t">\nnewer\n</channel>'
+        ),
+        _assistant_reply("777"),
+    ]
+    transcript = _write_transcript(tmp_path, entries)
+    tail = hook.read_transcript_tail_through_latest_discord_turn(str(transcript))
+    assert hook.chat_id_needing_reply(tail, stop_hook_active=False) is None
+
+
+def test_tail_reader_handles_missing_trailing_newline(tmp_path):
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text(
+        json.dumps(_user(DISCORD_ENVELOPE))
+        + "\n"
+        + json.dumps(_assistant_text("answered in terminal only"))
+    )
+    tail = hook.read_transcript_tail_through_latest_discord_turn(str(transcript))
+    assert hook.chat_id_needing_reply(tail, stop_hook_active=False) == "555"
+
+
+def test_tail_reader_returns_empty_for_missing_file(tmp_path):
+    missing = tmp_path / "does-not-exist.jsonl"
+    assert hook.read_transcript_tail_through_latest_discord_turn(str(missing)) == []

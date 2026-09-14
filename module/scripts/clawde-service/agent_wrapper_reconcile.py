@@ -9,13 +9,19 @@ AGENT_NAME_ARGUMENT_PATTERN = re.compile(r"--agent-name (\S+)")
 CONFIG_FILE_ARGUMENT_PATTERN = re.compile(r"--config-file (\S+)")
 
 
-def read_process_command_line(process_id: int) -> str:
+def read_all_process_command_lines() -> list[tuple[int, str]]:
     result = subprocess.run(
-        ["ps", "-ww", "-p", str(process_id), "-o", "command="],
+        ["ps", "-axww", "-o", "pid=,command="],
         capture_output=True,
         text=True,
     )
-    return result.stdout.strip()
+    process_command_lines = []
+    for line in result.stdout.splitlines():
+        process_id_text, _separator, command_line = line.strip().partition(" ")
+        if not process_id_text.isdigit():
+            continue
+        process_command_lines.append((int(process_id_text), command_line))
+    return process_command_lines
 
 
 def read_tmux_session_from_launch_config(config_file_path: str) -> str | None:
@@ -27,17 +33,10 @@ def read_tmux_session_from_launch_config(config_file_path: str) -> str | None:
 
 
 def find_session_agent_wrapper_processes(session_name: str) -> list[dict]:
-    pgrep_result = subprocess.run(
-        ["pgrep", "-f", AGENT_WRAPPER_PROCESS_MATCH_PATTERN],
-        capture_output=True,
-        text=True,
-    )
     wrapper_processes = []
-    for line in pgrep_result.stdout.split():
-        if not line.strip().isdigit():
+    for process_id, command_line in read_all_process_command_lines():
+        if AGENT_WRAPPER_PROCESS_MATCH_PATTERN not in command_line:
             continue
-        process_id = int(line)
-        command_line = read_process_command_line(process_id)
         agent_name_match = AGENT_NAME_ARGUMENT_PATTERN.search(command_line)
         config_file_match = CONFIG_FILE_ARGUMENT_PATTERN.search(command_line)
         if not agent_name_match or not config_file_match:
