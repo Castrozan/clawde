@@ -1,6 +1,7 @@
 import time
 
 from harness_productivity_delivery import (
+    judge_pending_delivery,
     judge_previous_turn_and_baseline_the_next,
     record_that_the_delivered_turn_showed_active_work,
 )
@@ -50,18 +51,37 @@ class DeliveredTurnObserver:
         self.agent_name = agent_name
         self.workspace_directory = workspace_directory
 
-    def judge_previous_delivery(self) -> dict:
+    def live_delivery_measurement(self) -> tuple[str | None, int | None]:
         session_identifier = live_session_identifier(
             self.runtime_root_directory, self.agent_name
         )
-        return judge_previous_turn_and_baseline_the_next(
-            self.record_file_path,
+        return (
             session_identifier,
             session_transcript_work_entry_count(
                 self.harness_runtime_profile,
                 session_identifier,
                 self.workspace_directory,
             ),
+        )
+
+    def judge_previous_delivery(self) -> dict:
+        session_identifier, transcript_work_entry_count = (
+            self.live_delivery_measurement()
+        )
+        return judge_previous_turn_and_baseline_the_next(
+            self.record_file_path,
+            session_identifier,
+            transcript_work_entry_count,
+        )
+
+    def judge_pending_delivery_without_baselining(self) -> dict:
+        session_identifier, transcript_work_entry_count = (
+            self.live_delivery_measurement()
+        )
+        return judge_pending_delivery(
+            self.record_file_path,
+            session_identifier,
+            transcript_work_entry_count,
         )
 
     def watch_this_delivery_for_active_work(

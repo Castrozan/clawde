@@ -144,7 +144,9 @@ def test_a_turn_finishing_inside_the_watch_window_still_counts_as_work(tmp_path)
     )
 
 
-def test_a_harness_without_a_readable_transcript_is_never_read_as_no_work(tmp_path):
+def test_a_harness_without_a_readable_transcript_counts_unobserved_turns_as_no_work(
+    tmp_path,
+):
     observer, record_path, transcript_file = build_parked_agent(tmp_path)
     transcript_file.unlink()
     for _ in range(3):
@@ -152,17 +154,35 @@ def test_a_harness_without_a_readable_transcript_is_never_read_as_no_work(tmp_pa
         observer.watch_this_delivery_for_active_work(
             PaneNeverReportingWork(), "pane-handle", lambda _seconds: None
         )
-    assert counted_unproductive_turns(record_path) == 0, (
-        "missing evidence must not accumulate toward a failover, because moving a "
-        "healthy agent off its harness is worse than missing every tick of evidence"
+    assert counted_unproductive_turns(record_path) == 2, (
+        "a provider refusing work leaves no readable transcript and never reports "
+        "the agent working, so reading that silence as productive would park the "
+        "agent on the refusing harness forever"
+    )
+
+
+def test_judging_without_baselining_consumes_the_pending_delivery_once(tmp_path):
+    observer, record_path, transcript_file = build_parked_agent(tmp_path)
+    transcript_file.unlink()
+    observer.judge_previous_delivery()
+    observer.judge_pending_delivery_without_baselining()
+    observer.judge_pending_delivery_without_baselining()
+    assert counted_unproductive_turns(record_path) == 1, (
+        "a heartbeat tick that the gate blocks must judge the delivery already sent "
+        "without baselining a delivery it never sent, so the pending refusal counts "
+        "once instead of fabricating a second measurement"
     )
 
 
 def test_a_rotated_session_does_not_inherit_the_previous_sessions_measurement(tmp_path):
     observer, record_path, transcript_file = build_parked_agent(tmp_path)
     deliver_a_turn(observer, PaneNeverReportingWork(), transcript_file, 0)
+    rotated_session_identifier = "a-newly-rotated-session"
     write_live_session_identifier(
-        observer.runtime_root_directory, "a-newly-rotated-session"
+        observer.runtime_root_directory, rotated_session_identifier
+    )
+    append_transcript_entries(
+        transcript_file.parent / f"{rotated_session_identifier}.jsonl", 40
     )
     deliver_a_turn(observer, PaneNeverReportingWork(), transcript_file, 0)
     assert counted_unproductive_turns(record_path) == 0, (

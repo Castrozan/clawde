@@ -36,6 +36,24 @@ def gate_allows_wake(gate_command: str | None) -> bool:
     return result.returncode == 0
 
 
+def run_scheduled_heartbeat_tick(
+    backend: HeartbeatMultiplexerBackend,
+    pane_handle,
+    harness_runtime_profile,
+    gate_command: str | None,
+    prompt: str,
+    delivered_turn_observer: DeliveredTurnObserver,
+) -> None:
+    if not backend.pane_is_idle(pane_handle, harness_runtime_profile):
+        return
+    if not gate_allows_wake(gate_command):
+        delivered_turn_observer.judge_pending_delivery_without_baselining()
+        return
+    delivered_turn_observer.judge_previous_delivery()
+    backend.send_prompt_to_pane(pane_handle, prompt)
+    delivered_turn_observer.watch_this_delivery_for_active_work(backend, pane_handle)
+
+
 def drive_heartbeat(
     backend: HeartbeatMultiplexerBackend,
     pane_handle,
@@ -50,14 +68,13 @@ def drive_heartbeat(
         now = datetime.datetime.now()
         if not cron_expression_matches(cron_expression, now):
             continue
-        if not backend.pane_is_idle(pane_handle, harness_runtime_profile):
-            continue
-        if not gate_allows_wake(gate_command):
-            continue
-        delivered_turn_observer.judge_previous_delivery()
-        backend.send_prompt_to_pane(pane_handle, prompt)
-        delivered_turn_observer.watch_this_delivery_for_active_work(
-            backend, pane_handle
+        run_scheduled_heartbeat_tick(
+            backend,
+            pane_handle,
+            harness_runtime_profile,
+            gate_command,
+            prompt,
+            delivered_turn_observer,
         )
 
 

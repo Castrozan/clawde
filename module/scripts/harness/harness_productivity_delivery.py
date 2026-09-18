@@ -17,7 +17,7 @@ def delivered_turn_produced_work(
     if record.get("delivered_turn_showed_active_work"):
         return True
     if transcript_work_entry_count is None:
-        return True
+        return False
     if record.get("delivered_turn_session_identifier") != session_identifier:
         return True
     entry_count_before_delivery = record.get(
