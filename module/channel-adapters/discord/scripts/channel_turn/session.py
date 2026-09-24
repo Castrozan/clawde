@@ -1,13 +1,10 @@
 import os
-import subprocess
-import tempfile
 import time
 import uuid
 
 SESSION_STARTED_MARKER_FILE_NAME = "bridge-session-started"
 CHANNEL_SESSION_IDENTIFIER_FILE_NAME = "channel-session-identifier"
 CHANNEL_SESSION_LAST_TURN_DATE_FILE_NAME = "channel-session-last-turn-date"
-TURN_TIMEOUT_SECONDS = 900
 
 
 def session_started_marker_path(state_directory: str) -> str:
@@ -99,74 +96,3 @@ def rotate_the_channel_session_if_needed(
         state_directory, daily_session_rotation, time.strftime("%Y-%m-%d")
     ):
         forget_the_channel_session(state_directory)
-
-
-def build_turn_environment(
-    prompt: str, reply_file_path: str, resuming: bool, session_identifier: str
-) -> dict[str, str]:
-    return {
-        **os.environ,
-        "CLAWDE_CHANNEL_PROMPT": prompt,
-        "CLAWDE_CHANNEL_REPLY_FILE": reply_file_path,
-        "CLAWDE_CHANNEL_SESSION_CONTINUATION": "1" if resuming else "",
-        "CLAWDE_CHANNEL_SESSION_IDENTIFIER": session_identifier,
-    }
-
-
-def read_reply_file(reply_file_path: str) -> str:
-    try:
-        with open(reply_file_path) as reply_file:
-            return reply_file.read().strip()
-    except OSError:
-        return ""
-
-
-def run_one_turn(
-    one_shot_turn_command: str,
-    workspace_directory: str,
-    state_directory: str,
-    prompt: str,
-    daily_session_rotation: bool = False,
-) -> tuple[str, str]:
-    """Run one channel turn and return its reply and failure text.
-
-    An empty failure with an empty reply means the harness completed the turn
-    and deliberately sent nothing, which the caller must keep silent.
-    """
-    rotate_the_channel_session_if_needed(state_directory, daily_session_rotation)
-    resuming = (
-        a_previous_turn_is_resumable(state_directory)
-        and read_channel_session_identifier(state_directory) is not None
-    )
-    if resuming:
-        session_identifier = read_channel_session_identifier(state_directory)
-        assert session_identifier is not None
-    else:
-        session_identifier = mint_fresh_channel_session_identifier(state_directory)
-    with tempfile.TemporaryDirectory() as reply_directory:
-        reply_file_path = os.path.join(reply_directory, "reply.txt")
-        try:
-            completed_turn = subprocess.run(
-                ["bash", "-c", one_shot_turn_command],
-                cwd=workspace_directory,
-                env=build_turn_environment(
-                    prompt, reply_file_path, resuming, session_identifier
-                ),
-                capture_output=True,
-                text=True,
-                timeout=TURN_TIMEOUT_SECONDS,
-            )
-        except subprocess.TimeoutExpired:
-            forget_the_channel_session(state_directory)
-            return "", f"one-shot turn exceeded {TURN_TIMEOUT_SECONDS} seconds"
-        reply = read_reply_file(reply_file_path)
-    if reply:
-        remember_that_a_turn_completed(state_directory)
-        write_channel_session_last_turn_date(state_directory, time.strftime("%Y-%m-%d"))
-        return reply, ""
-    if completed_turn.returncode == 0:
-        remember_that_a_turn_completed(state_directory)
-        write_channel_session_last_turn_date(state_directory, time.strftime("%Y-%m-%d"))
-        return "", ""
-    forget_the_channel_session(state_directory)
-    return "", (completed_turn.stderr or completed_turn.stdout).strip()

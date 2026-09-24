@@ -130,7 +130,7 @@ in
             buildOneShotTurnCommandFor = lib.mkOption {
               type = lib.types.nullOr (lib.types.functionTo lib.types.str);
               default = null;
-              description = "Function: { name, agent, workspaceDirectory, instructionsFile } -> the shell command that runs one turn of a conversation and exits, taking its prompt from $CLAWDE_CHANNEL_PROMPT, continuing the previous turn when $CLAWDE_CHANNEL_SESSION_CONTINUATION is non-empty, and leaving the assistant's reply and nothing else in the file named by $CLAWDE_CHANNEL_REPLY_FILE. Null means the harness has no headless mode, so channel adapters that drive it from a sidecar process cannot carry it.";
+              description = "Function: { name, agent, workspaceDirectory, instructionsFile } -> the shell command that runs one turn of a conversation and exits, taking its prompt from $CLAWDE_CHANNEL_PROMPT and continuing the previous turn when $CLAWDE_CHANNEL_SESSION_CONTINUATION is non-empty. A completed turn exits zero and writes only the final assistant reply to $CLAWDE_CHANNEL_REPLY_FILE; intentional silence writes an empty file. Failed or incomplete turns exit nonzero. Missing result files are failures. Diagnostics, reasoning and tool output never belong in the reply file. Null means the harness has no headless mode, so channel adapters that drive it from a sidecar process cannot carry it.";
             };
             runtimeProfile = lib.mkOption {
               type = runtimeProfileType;

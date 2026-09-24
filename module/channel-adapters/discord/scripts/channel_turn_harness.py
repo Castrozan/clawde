@@ -3,6 +3,7 @@ from active_harness import (
     read_launch_config,
     runtime_root_directory_from_launch_config_path,
 )
+from channel_turn.result import ChannelTurnResult
 from harness_productivity_record import (
     begin_harness_productivity_record,
     harness_productivity_record_path,
@@ -27,11 +28,11 @@ def resolve_active_one_shot_turn_command(
     return active_harness_name, command if isinstance(command, str) else None
 
 
-def record_channel_turn_productivity(
+def record_channel_turn_result(
     launch_config_path: str,
     agent_name: str,
     active_harness_name: str,
-    turn_was_productive: bool,
+    result: ChannelTurnResult,
 ) -> None:
     record_path = harness_productivity_record_path(
         runtime_root_directory_from_launch_config_path(launch_config_path), agent_name
@@ -39,4 +40,4 @@ def record_channel_turn_productivity(
     record = read_harness_productivity_record(record_path)
     if record.get("harness") != active_harness_name:
         begin_harness_productivity_record(record_path, active_harness_name)
-    record_observed_heartbeat_turn(record_path, turn_was_productive)
+    record_observed_heartbeat_turn(record_path, result.succeeded)

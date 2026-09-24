@@ -2,6 +2,7 @@ import json
 import pathlib
 
 import channel_turn_harness
+from channel_turn.result import ChannelTurnResult
 from active_harness import override_file_path_for_agent
 from harness_productivity_record import (
     harness_productivity_record_path,
@@ -80,8 +81,8 @@ def test_a_harness_without_a_one_shot_command_resolves_to_none(tmp_path):
 def test_productivity_record_tracks_turns_against_the_active_harness(tmp_path):
     launch_config_path = deploy_launch_config(tmp_path, LAUNCH_CONFIG)
     record_path = harness_productivity_record_path(str(tmp_path), AGENT_NAME)
-    channel_turn_harness.record_channel_turn_productivity(
-        launch_config_path, AGENT_NAME, "claude", turn_was_productive=True
+    channel_turn_harness.record_channel_turn_result(
+        launch_config_path, AGENT_NAME, "claude", ChannelTurnResult(reply="hello")
     )
     assert read_harness_productivity_record(str(record_path))["harness"] == "claude"
     assert (
@@ -90,8 +91,11 @@ def test_productivity_record_tracks_turns_against_the_active_harness(tmp_path):
         ]
         == 0
     )
-    channel_turn_harness.record_channel_turn_productivity(
-        launch_config_path, AGENT_NAME, "claude", turn_was_productive=False
+    channel_turn_harness.record_channel_turn_result(
+        launch_config_path,
+        AGENT_NAME,
+        "claude",
+        ChannelTurnResult(failure="provider unavailable"),
     )
     assert (
         read_harness_productivity_record(str(record_path))[
@@ -104,14 +108,20 @@ def test_productivity_record_tracks_turns_against_the_active_harness(tmp_path):
 def test_productivity_record_rebegins_when_the_active_harness_changes(tmp_path):
     launch_config_path = deploy_launch_config(tmp_path, LAUNCH_CONFIG)
     record_path = harness_productivity_record_path(str(tmp_path), AGENT_NAME)
-    channel_turn_harness.record_channel_turn_productivity(
-        launch_config_path, AGENT_NAME, "claude", turn_was_productive=False
+    channel_turn_harness.record_channel_turn_result(
+        launch_config_path,
+        AGENT_NAME,
+        "claude",
+        ChannelTurnResult(failure="provider unavailable"),
     )
-    channel_turn_harness.record_channel_turn_productivity(
-        launch_config_path, AGENT_NAME, "claude", turn_was_productive=False
+    channel_turn_harness.record_channel_turn_result(
+        launch_config_path,
+        AGENT_NAME,
+        "claude",
+        ChannelTurnResult(failure="provider unavailable"),
     )
-    channel_turn_harness.record_channel_turn_productivity(
-        launch_config_path, AGENT_NAME, "opencode", turn_was_productive=True
+    channel_turn_harness.record_channel_turn_result(
+        launch_config_path, AGENT_NAME, "opencode", ChannelTurnResult(reply="hello")
     )
     record = read_harness_productivity_record(str(record_path))
     assert record["harness"] == "opencode"

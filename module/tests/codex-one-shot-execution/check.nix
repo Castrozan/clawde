@@ -63,8 +63,8 @@ pkgs.runCommand "clawde-codex-one-shot-execution" { } ''
   export FAKECODEX_ENVELOPE_FILE="$silence_envelope_path"
   export CLAWDE_CHANNEL_REPLY_FILE="$silence_directory/reply.txt"
   bash -c "$codex_one_shot_command"
-  if [ -e "$CLAWDE_CHANNEL_REPLY_FILE" ]; then
-    echo "FAIL: silence left a public reply file" >&2
+  if [ ! -f "$CLAWDE_CHANNEL_REPLY_FILE" ] || [ -s "$CLAWDE_CHANNEL_REPLY_FILE" ]; then
+    echo "FAIL: silence did not publish an empty successful result" >&2
     exit 1
   fi
 

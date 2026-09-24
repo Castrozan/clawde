@@ -6,7 +6,7 @@ import sys
 import discord
 from channel_access import load_access_document, message_is_for_this_agent
 from channel_turn_harness import (
-    record_channel_turn_productivity,
+    record_channel_turn_result,
     resolve_active_one_shot_turn_command,
 )
 from channel_message.inbound_media import prompt_for_message_with_media
@@ -14,7 +14,7 @@ from channel_message.outbound_reply import (
     send_reply,
     split_reply_into_text_and_attachments,
 )
-from harness_turn import run_one_turn
+from channel_turn.execution import run_one_turn
 
 BOT_TOKEN_ENVIRONMENT_VARIABLE = "DISCORD_BOT_TOKEN"
 
@@ -68,10 +68,6 @@ class AgentBridgeClient(discord.Client):
                         f"active harness {active_harness_name} has no one-shot "
                         "turn command to answer Discord with",
                     )
-                    await message.channel.send(
-                        f"{self.agent_name} cannot answer turns on "
-                        f"{active_harness_name}."
-                    )
                     return
                 prompt = await prompt_for_message_with_media(
                     message,
@@ -84,7 +80,7 @@ class AgentBridgeClient(discord.Client):
                         f"message {message.id} carried nothing this bridge can render",
                     )
                     return
-                reply, failure = await asyncio.to_thread(
+                result = await asyncio.to_thread(
                     run_one_turn,
                     one_shot_turn_command,
                     self.workspace_directory,
@@ -92,25 +88,28 @@ class AgentBridgeClient(discord.Client):
                     prompt,
                     self.daily_session_rotation,
                 )
-                record_channel_turn_productivity(
+                record_channel_turn_result(
                     self.launch_config_path,
                     self.agent_name,
                     active_harness_name,
-                    turn_was_productive=bool(reply),
+                    result,
                 )
-        if not reply:
-            log(self.agent_name, f"turn produced no reply: {failure[:400]}")
-            if failure:
-                await message.channel.send(
-                    f"{self.agent_name} could not answer that turn. Its log has the detail."
+            if not result.succeeded:
+                log(
+                    self.agent_name,
+                    f"{active_harness_name} turn failed: {result.failure[:400]}",
                 )
-            return
-        split = split_reply_into_text_and_attachments(reply, self.workspace_directory)
-        for refused_path in split.refused_paths:
-            log(self.agent_name, f"refused to attach {refused_path}")
-        await send_reply(
-            message.channel, split, lambda note: log(self.agent_name, note)
-        )
+                return
+            if not result.reply:
+                return
+            split = split_reply_into_text_and_attachments(
+                result.reply, self.workspace_directory
+            )
+            for refused_path in split.refused_paths:
+                log(self.agent_name, f"refused to attach {refused_path}")
+            await send_reply(
+                message.channel, split, lambda note: log(self.agent_name, note)
+            )
 
 
 def parse_arguments() -> argparse.Namespace:

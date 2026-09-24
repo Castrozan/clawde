@@ -43,8 +43,7 @@ def main(argv):
         return 1
     if not is_valid_envelope(envelope):
         return 1
-    if envelope["action"] == "reply":
-        write_public_reply(reply_path, envelope["text"])
+    write_public_reply(reply_path, envelope["text"])
     return 0
 
 

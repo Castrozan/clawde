@@ -1,31 +1,59 @@
-import re
+import json
 import sys
-
-ANSI_ESCAPE_SEQUENCE = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]")
-SESSION_HEADER_LINE = re.compile(r"^>\s")
+from collections.abc import Iterable
 
 
-def strip_terminal_control_sequences(raw_output: str) -> str:
-    return ANSI_ESCAPE_SEQUENCE.sub("", raw_output)
+def extract_assistant_reply(output_lines: Iterable[str]) -> str:
+    reply_parts: dict[str, str] = {}
+    completed = False
+    step_open = False
+    for line in output_lines:
+        if not line.strip():
+            continue
+        event = json.loads(line)
+        if not isinstance(event, dict):
+            raise ValueError("OpenCode emitted an invalid turn event")
+        event_type = event.get("type")
+        if event_type == "error":
+            raise ValueError(
+                f"OpenCode turn failed: {event.get('error', 'unknown error')}"
+            )
+        part = event.get("part", {})
+        if not isinstance(part, dict):
+            raise ValueError("OpenCode emitted an invalid message part")
+        if event_type == "step_start":
+            reply_parts.clear()
+            completed = False
+            step_open = True
+        elif event_type == "text":
+            if (
+                not step_open
+                or not isinstance(part.get("text"), str)
+                or not isinstance(part.get("id"), str)
+            ):
+                raise ValueError("OpenCode emitted an invalid assistant text part")
+            reply_parts[part["id"]] = part["text"]
+        elif event_type == "step_finish":
+            if not step_open:
+                raise ValueError("OpenCode finished a step that never started")
+            step_open = False
+            completed = part.get("reason") == "stop"
+            if not completed:
+                reply_parts.clear()
+    if not completed:
+        raise ValueError("OpenCode did not complete a final assistant turn")
+    return "\n".join(reply_parts.values())
 
 
-def lines_after_the_session_header(output_lines: list[str]) -> list[str]:
-    for line_index, line in enumerate(output_lines):
-        if SESSION_HEADER_LINE.match(line):
-            return output_lines[line_index + 1 :]
-    return output_lines
-
-
-def extract_assistant_reply(raw_output: str) -> str:
-    reply_lines = lines_after_the_session_header(
-        strip_terminal_control_sequences(raw_output).splitlines()
-    )
-    return "\n".join(reply_lines).strip()
-
-
-def main() -> None:
-    sys.stdout.write(extract_assistant_reply(sys.stdin.read()))
+def main() -> int:
+    try:
+        reply = extract_assistant_reply(sys.stdin)
+    except ValueError as error:
+        print(error, file=sys.stderr)
+        return 1
+    sys.stdout.write(reply)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

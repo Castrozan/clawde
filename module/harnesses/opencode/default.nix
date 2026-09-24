@@ -130,7 +130,7 @@ in
           stateAssignment = "XDG_DATA_HOME=${lib.escapeShellArg (channelBridgeStateDirectory name)}";
           continueFlag = "\${CLAWDE_CHANNEL_SESSION_CONTINUATION:+--continue}";
         in
-        "${unshadowedBinaryPathAssignment} ${configurationAssignment} ${stateAssignment} ${binaryInvocation} run ${continueFlag} \"$CLAWDE_CHANNEL_PROMPT\" | ${extractReplyFromRunOutput} > \"$CLAWDE_CHANNEL_REPLY_FILE\"";
+        "${unshadowedBinaryPathAssignment} ${configurationAssignment} ${stateAssignment} ${binaryInvocation} run --format json ${continueFlag} \"$CLAWDE_CHANNEL_PROMPT\" | ${extractReplyFromRunOutput} > \"$CLAWDE_CHANNEL_REPLY_FILE\"";
 
       workspaceFilesFor =
         { name, agent, ... }:

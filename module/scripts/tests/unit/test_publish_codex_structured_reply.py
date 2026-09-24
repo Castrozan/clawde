@@ -43,7 +43,7 @@ def test_publishes_no_content_for_a_valid_silence(tmp_path):
     result = run_parser(structured_path, reply_path)
 
     assert result.returncode == 0
-    assert not reply_path.exists()
+    assert reply_path.read_text(encoding="utf-8") == ""
 
 
 def test_fails_closed_on_malformed_json(tmp_path):

@@ -100,6 +100,11 @@ forAllSystems (
       module = self.homeManagerModules.clawde;
     };
 
+    channel-turn-execution = import ../module/tests/channel-turn-execution/check.nix {
+      inherit pkgs lib;
+      module = self.homeManagerModules.clawde;
+    };
+
     formatting =
       pkgs.runCommand "clawde-formatting"
         {
