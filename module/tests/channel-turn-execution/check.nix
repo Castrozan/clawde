@@ -12,9 +12,9 @@ let
       lifetime = "agent";
     }
   );
-  launchConfig = pkgs.writeText "channel-launch-config.json" (
-    evaluated.config.home.file."clawde/launch-config/fixture-agent.json".text
-  );
+  launchConfig =
+    pkgs.writeText "channel-launch-config.json"
+      evaluated.config.home.file."clawde/launch-config/fixture-agent.json".text;
   fakeHarnesses =
     map
       (
