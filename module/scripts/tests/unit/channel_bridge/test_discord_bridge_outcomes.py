@@ -13,7 +13,20 @@ from .discord_bridge_test_support import (
 
 
 @pytest.mark.parametrize(
-    "reply", ["", "  \n ", "(no reply)", "(mute)", "(sem resposta)"]
+    "reply",
+    [
+        "",
+        "  \n ",
+        "(no reply)",
+        "*(no reply)*",
+        "(mute)",
+        "(sem resposta)",
+        "arbitrary model narration",
+        '{"action":"silence","text":""}',
+        '{"action":[],"text":"bad"}',
+        '{"action":"reply","text":""}',
+        '{"action":"reply","text":"hidden","extra":true}',
+    ],
 )
 def test_successful_silence_never_posts_or_triggers_harness_failover(tmp_path, reply):
     channel = RecordingChannel()
@@ -59,9 +72,10 @@ def test_failed_turns_publish_nothing_and_still_trigger_failover(tmp_path, comma
 
 def test_a_real_reply_mentioning_the_placeholder_is_delivered_unchanged(tmp_path):
     reply = "You posted (no reply) again."
+    envelope = json.dumps({"action": "reply", "text": reply})
     channel = RecordingChannel()
     client, _ = build_client(
-        tmp_path, f'printf %s {shlex.quote(reply)} > "$CLAWDE_CHANNEL_REPLY_FILE"'
+        tmp_path, f'printf %s {shlex.quote(envelope)} > "$CLAWDE_CHANNEL_REPLY_FILE"'
     )
 
     asyncio.run(client.on_message(StubMessage(channel, clean_content="hello")))

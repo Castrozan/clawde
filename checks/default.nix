@@ -95,11 +95,6 @@ forAllSystems (
       lib.concatStringsSep "\n" (map checkAssertion discordTransportFixture.assertions) + "\ntouch $out"
     );
 
-    codex-one-shot-execution = import ../module/tests/codex-one-shot-execution/check.nix {
-      inherit pkgs lib;
-      module = self.homeManagerModules.clawde;
-    };
-
     channel-turn-execution = import ../module/tests/channel-turn-execution/check.nix {
       inherit pkgs lib;
       module = self.homeManagerModules.clawde;

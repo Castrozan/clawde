@@ -5,23 +5,25 @@ from pathlib import Path
 
 harness, *arguments = sys.argv[1:]
 reply = os.environ["FIXTURE_REPLY"]
+envelope = json.loads(reply) if reply.startswith("{") else None
 failure = os.environ.get("FIXTURE_FAILURE") == "1"
 
 if harness == "codex":
     assert "--output-schema" in arguments
     output_path = arguments[arguments.index("--output-last-message") + 1]
-    Path(output_path).write_text(
-        json.dumps({"action": "reply" if reply else "silence", "text": reply})
-    )
+    Path(output_path).write_text(reply)
 elif harness == "claude":
     assert arguments[arguments.index("--output-format") + 1] == "json"
+    schema = json.loads(arguments[arguments.index("--json-schema") + 1])
+    assert set(schema["required"]) == {"action", "text"}
     print(
         json.dumps(
             {
                 "type": "result",
                 "subtype": "success",
                 "is_error": failure,
-                "result": reply,
+                "result": "private model narration",
+                "structured_output": envelope,
             }
         )
     )

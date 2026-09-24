@@ -9,10 +9,8 @@ def extract_assistant_reply(payload: object) -> str:
         raise ValueError(
             f"Claude turn failed: {payload.get('subtype', 'unknown result')}"
         )
-    reply = payload.get("result")
-    if not isinstance(reply, str):
-        raise ValueError("Claude turn result has no assistant text field")
-    return reply
+    envelope = payload.get("structured_output")
+    return json.dumps(envelope) if envelope is not None else ""
 
 
 def main() -> int:

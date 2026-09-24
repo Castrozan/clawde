@@ -168,7 +168,7 @@ in
     (assertLacks "claude-sidecar-drops-plugin-workspace-settings" "enabledPlugins" (
       settingsTextFor claudeSidecarEvaluated
     ))
-    (assertContains "claude-sidecar-instructions-use-plain-text-reply" "plain text" (
+    (assertContains "claude-sidecar-instructions-use-reply-envelope" "exactly one JSON object" (
       instructionsFor claudeSidecarEvaluated
     ))
     (assertion "service-lifetime-sidecar-lifetime" "service"

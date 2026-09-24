@@ -4,7 +4,7 @@ from channel_turn import session
 
 def test_the_first_turn_starts_a_session_and_the_next_one_continues_it(tmp_path):
     state_directory = str(tmp_path / "state")
-    command = 'printf "%s|%s" "$CLAWDE_CHANNEL_SESSION_CONTINUATION" "$CLAWDE_CHANNEL_PROMPT" > "$CLAWDE_CHANNEL_REPLY_FILE"'
+    command = 'printf \'{"action":"reply","text":"%s|%s"}\' "$CLAWDE_CHANNEL_SESSION_CONTINUATION" "$CLAWDE_CHANNEL_PROMPT" > "$CLAWDE_CHANNEL_REPLY_FILE"'
     first_reply = harness_turn.run_one_turn(
         command, str(tmp_path), state_directory, "hello"
     )
@@ -17,7 +17,7 @@ def test_the_first_turn_starts_a_session_and_the_next_one_continues_it(tmp_path)
 
 def test_a_silent_turn_keeps_the_channel_session_for_the_next_reply(tmp_path):
     state_directory = str(tmp_path / "state")
-    command = 'printf "%s" "$CLAWDE_CHANNEL_SESSION_IDENTIFIER" > "$CLAWDE_CHANNEL_REPLY_FILE"'
+    command = 'printf \'{"action":"reply","text":"%s"}\' "$CLAWDE_CHANNEL_SESSION_IDENTIFIER" > "$CLAWDE_CHANNEL_REPLY_FILE"'
     first_identifier = harness_turn.run_one_turn(
         command, str(tmp_path), state_directory, "hello"
     )
@@ -43,7 +43,7 @@ def test_a_failed_resume_drops_the_session_so_the_next_turn_starts_fresh(tmp_pat
 
 def test_a_turn_mints_a_channel_session_identifier_and_a_resume_reuses_it(tmp_path):
     state_directory = str(tmp_path / "state")
-    command = 'printf "%s" "$CLAWDE_CHANNEL_SESSION_IDENTIFIER" > "$CLAWDE_CHANNEL_REPLY_FILE"'
+    command = 'printf \'{"action":"reply","text":"%s"}\' "$CLAWDE_CHANNEL_SESSION_IDENTIFIER" > "$CLAWDE_CHANNEL_REPLY_FILE"'
     first_identifier = harness_turn.run_one_turn(
         command, str(tmp_path), state_directory, "hello"
     )
@@ -58,7 +58,7 @@ def test_a_failed_resumed_turn_forgets_the_identifier_so_the_next_turn_starts_fr
     tmp_path,
 ):
     state_directory = str(tmp_path / "state")
-    command = 'printf "%s" "$CLAWDE_CHANNEL_SESSION_IDENTIFIER" > "$CLAWDE_CHANNEL_REPLY_FILE"'
+    command = 'printf \'{"action":"reply","text":"%s"}\' "$CLAWDE_CHANNEL_SESSION_IDENTIFIER" > "$CLAWDE_CHANNEL_REPLY_FILE"'
     first_identifier = harness_turn.run_one_turn(
         command, str(tmp_path), state_directory, "hello"
     )
@@ -73,7 +73,7 @@ def test_daily_session_rotation_resets_the_channel_session_across_a_date_boundar
     tmp_path,
 ):
     state_directory = str(tmp_path / "state")
-    command = 'printf "%s|%s" "$CLAWDE_CHANNEL_SESSION_CONTINUATION" "$CLAWDE_CHANNEL_SESSION_IDENTIFIER" > "$CLAWDE_CHANNEL_REPLY_FILE"'
+    command = 'printf \'{"action":"reply","text":"%s|%s"}\' "$CLAWDE_CHANNEL_SESSION_CONTINUATION" "$CLAWDE_CHANNEL_SESSION_IDENTIFIER" > "$CLAWDE_CHANNEL_REPLY_FILE"'
     first_reply = harness_turn.run_one_turn(
         command, str(tmp_path), state_directory, "hello", daily_session_rotation=True
     )
@@ -90,7 +90,7 @@ def test_daily_session_rotation_resets_the_channel_session_across_a_date_boundar
 
 def test_daily_session_rotation_keeps_the_session_within_the_same_date(tmp_path):
     state_directory = str(tmp_path / "state")
-    command = 'printf "%s|%s" "$CLAWDE_CHANNEL_SESSION_CONTINUATION" "$CLAWDE_CHANNEL_SESSION_IDENTIFIER" > "$CLAWDE_CHANNEL_REPLY_FILE"'
+    command = 'printf \'{"action":"reply","text":"%s|%s"}\' "$CLAWDE_CHANNEL_SESSION_CONTINUATION" "$CLAWDE_CHANNEL_SESSION_IDENTIFIER" > "$CLAWDE_CHANNEL_REPLY_FILE"'
     harness_turn.run_one_turn(
         command, str(tmp_path), state_directory, "hello", daily_session_rotation=True
     )
@@ -103,7 +103,7 @@ def test_daily_session_rotation_keeps_the_session_within_the_same_date(tmp_path)
 
 def test_without_daily_rotation_a_stale_date_does_not_reset_the_session(tmp_path):
     state_directory = str(tmp_path / "state")
-    command = 'printf "%s|%s" "$CLAWDE_CHANNEL_SESSION_CONTINUATION" "$CLAWDE_CHANNEL_SESSION_IDENTIFIER" > "$CLAWDE_CHANNEL_REPLY_FILE"'
+    command = 'printf \'{"action":"reply","text":"%s|%s"}\' "$CLAWDE_CHANNEL_SESSION_CONTINUATION" "$CLAWDE_CHANNEL_SESSION_IDENTIFIER" > "$CLAWDE_CHANNEL_REPLY_FILE"'
     harness_turn.run_one_turn(command, str(tmp_path), state_directory, "hello")
     session.write_channel_session_last_turn_date(state_directory, "1970-01-01")
     next_reply = harness_turn.run_one_turn(

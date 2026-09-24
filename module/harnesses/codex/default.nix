@@ -66,7 +66,6 @@ let
 
   codexBuilders = import ./builders.nix {
     inherit
-      pkgs
       lib
       cfg
       codexHomeRelativeToHome

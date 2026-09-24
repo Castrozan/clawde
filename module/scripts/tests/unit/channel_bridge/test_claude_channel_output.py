@@ -20,13 +20,26 @@ def run_parser(payload):
     )
 
 
-@pytest.mark.parametrize("reply", ["", "public reply"])
+@pytest.mark.parametrize(
+    "reply",
+    [
+        None,
+        {"action": "silence", "text": ""},
+        {"action": "reply", "text": "public reply"},
+    ],
+)
 def test_only_a_successful_result_is_published(reply):
     result = run_parser(
-        {"type": "result", "subtype": "success", "is_error": False, "result": reply}
+        {
+            "type": "result",
+            "subtype": "success",
+            "is_error": False,
+            "result": "private narration",
+            "structured_output": reply,
+        }
     )
     assert result.returncode == 0
-    assert result.stdout == reply
+    assert result.stdout == (json.dumps(reply) if reply is not None else "")
 
 
 @pytest.mark.parametrize(
@@ -37,8 +50,6 @@ def test_only_a_successful_result_is_published(reply):
         {"type": "result", "subtype": "success", "is_error": True, "result": "quota"},
         {"type": "result", "subtype": "error_max_turns", "result": "partial reply"},
         {"type": "assistant", "result": "intermediate reply"},
-        {"type": "result", "subtype": "success", "is_error": False},
-        {"type": "result", "subtype": "success", "is_error": False, "result": 42},
     ],
 )
 def test_unsuccessful_or_missing_results_never_become_public_text(payload):

@@ -9,18 +9,24 @@ from channel_turn.execution import run_one_turn
 commands = json.loads(Path(sys.argv[1]).read_text())["harness_one_shot_turn_commands"]
 with tempfile.TemporaryDirectory() as directory:
     for harness, command in commands.items():
-        for reply in ("public answer", "", "(no reply)"):
+        cases = [
+            (json.dumps({"action": "reply", "text": "public answer"}), "public answer"),
+            (json.dumps({"action": "silence", "text": ""}), ""),
+            (json.dumps({"action": [], "text": "bad"}), ""),
+            ("", ""),
+            ("*(no reply)*", ""),
+        ]
+        for reply, expected in cases:
             os.environ["FIXTURE_REPLY"] = reply
             os.environ["FIXTURE_FAILURE"] = "0"
             result = run_one_turn(
                 command, directory, str(Path(directory) / harness), "hello"
             )
             assert result.succeeded, (harness, result)
-            assert result.reply == ("" if reply == "(no reply)" else reply), (
-                harness,
-                result,
-            )
-        os.environ["FIXTURE_REPLY"] = "incomplete text"
+            assert result.reply == expected, (harness, result)
+        os.environ["FIXTURE_REPLY"] = json.dumps(
+            {"action": "reply", "text": "incomplete text"}
+        )
         os.environ["FIXTURE_FAILURE"] = "1"
         result = run_one_turn(
             command, directory, str(Path(directory) / harness), "hello"

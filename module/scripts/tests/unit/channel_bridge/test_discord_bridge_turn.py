@@ -1,4 +1,7 @@
 import asyncio
+import json
+import shlex
+import sys
 
 from .discord_bridge_test_support import (
     RecordingChannel,
@@ -11,9 +14,9 @@ from .discord_bridge_test_support import (
 
 def test_a_video_only_message_runs_a_turn_whose_prompt_names_the_saved_file(tmp_path):
     channel = RecordingChannel()
-    client, _ = build_client(
-        tmp_path, 'printf "%s" "$CLAWDE_CHANNEL_PROMPT" > "$CLAWDE_CHANNEL_REPLY_FILE"'
-    )
+    script = "import json, os; print(json.dumps({'action': 'reply', 'text': os.environ['CLAWDE_CHANNEL_PROMPT']}))"
+    command = f'{shlex.quote(sys.executable)} -c {shlex.quote(script)} > "$CLAWDE_CHANNEL_REPLY_FILE"'
+    client, _ = build_client(tmp_path, command)
     message = StubMessage(
         channel,
         attachments=[StubAttachment("spiderman.mp4", "video/mp4", 7, b"MOOVATOM")],
@@ -33,8 +36,9 @@ def test_a_reply_naming_a_workspace_file_arrives_as_an_attachment(tmp_path):
     gif_path = workspace_directory / "media" / "sneer.gif"
     gif_path.parent.mkdir(parents=True)
     gif_path.write_bytes(b"GIF89a")
+    envelope = json.dumps({"action": "reply", "text": f"toma\n{gif_path}"})
     write_launch_config(
-        tmp_path, f'printf "toma\\n{gif_path}" > "$CLAWDE_CHANNEL_REPLY_FILE"'
+        tmp_path, f'printf %s {shlex.quote(envelope)} > "$CLAWDE_CHANNEL_REPLY_FILE"'
     )
 
     asyncio.run(client.on_message(StubMessage(channel, clean_content="manda um gif")))

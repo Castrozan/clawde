@@ -1,5 +1,4 @@
 {
-  pkgs,
   lib,
   cfg,
   codexHomeRelativeToHome,
@@ -12,9 +11,6 @@
   codexConfigurationTomlFormat,
   buildCodexConfigurationFor,
 }:
-let
-  structuredReplyParserCommand = "${pkgs.python312}/bin/python3 ${./scripts/publish-codex-structured-reply.py}";
-in
 {
   buildLaunchCommandFor =
     {
@@ -55,10 +51,9 @@ in
       codexHomeAssignment = "CODEX_HOME=${lib.escapeShellArg (channelBridgeHomeDirectory name)}";
       developerInstructionsFlag = "-c developer_instructions=\"$(cat ${instructionsFile})\"";
       resumeSubcommand = "\${CLAWDE_CHANNEL_SESSION_CONTINUATION:+resume --last}";
-      structuredRawOutputPath = "\${CLAWDE_CHANNEL_REPLY_FILE}.codex-turns";
-      codexReplySchema = ./reply-schema.json;
+      codexReplySchema = ../../lib/channel-reply-schema.json;
     in
-    "${unshadowedBinaryPathAssignment} ${codexHomeAssignment} ${binaryInvocation} exec ${resumeSubcommand} --dangerously-bypass-approvals-and-sandbox --output-schema ${lib.escapeShellArg (builtins.toString codexReplySchema)} --output-last-message \"${structuredRawOutputPath}\" ${developerInstructionsFlag} \"$CLAWDE_CHANNEL_PROMPT\" && ${structuredReplyParserCommand} \"${structuredRawOutputPath}\" \"$CLAWDE_CHANNEL_REPLY_FILE\"";
+    "${unshadowedBinaryPathAssignment} ${codexHomeAssignment} ${binaryInvocation} exec ${resumeSubcommand} --dangerously-bypass-approvals-and-sandbox --output-schema ${lib.escapeShellArg (builtins.toString codexReplySchema)} --output-last-message \"$CLAWDE_CHANNEL_REPLY_FILE\" ${developerInstructionsFlag} \"$CLAWDE_CHANNEL_PROMPT\"";
 
   workspaceFilesFor =
     {

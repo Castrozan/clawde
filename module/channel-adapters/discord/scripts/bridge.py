@@ -100,6 +100,11 @@ class AgentBridgeClient(discord.Client):
                     f"{active_harness_name} turn failed: {result.failure[:400]}",
                 )
                 return
+            if result.discarded_reply_reason:
+                log(
+                    self.agent_name,
+                    f"discarded {active_harness_name} output: {result.discarded_reply_reason}",
+                )
             if not result.reply:
                 return
             split = split_reply_into_text_and_attachments(
