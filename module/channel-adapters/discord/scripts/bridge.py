@@ -84,7 +84,7 @@ class AgentBridgeClient(discord.Client):
                     run_one_turn,
                     one_shot_turn_command,
                     self.workspace_directory,
-                    self.state_directory,
+                    os.path.join(self.state_directory, "sessions", active_harness_name),
                     prompt,
                     self.daily_session_rotation,
                 )
