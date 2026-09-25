@@ -1,5 +1,4 @@
 import subprocess
-from pathlib import Path
 
 import pytest
 
@@ -104,7 +103,9 @@ def test_missing_ionice_runs_validation_command_directly(monkeypatch):
     assert command == ["validator"]
 
 
-def test_rebuild_starting_during_validation_preempts_and_restarts_it(monkeypatch):
+def test_rebuild_starting_during_validation_preempts_and_restarts_it(
+    monkeypatch, tmp_path
+):
     first_process = ValidationProcess(4312, ["timeout"])
     second_process = ValidationProcess(4313, [0])
     validation_processes = iter([first_process, second_process])
@@ -133,7 +134,7 @@ def test_rebuild_starting_during_validation_preempts_and_restarts_it(monkeypatch
 
     exit_code = steward_defer_to_rebuild.run_validation_with_rebuild_preemption(
         ["validator"],
-        Path("/tmp/rebuild.lock.d"),
+        tmp_path / "rebuild.lock.d",
         1,
     )
 
@@ -160,7 +161,7 @@ def test_terminated_leader_with_surviving_group_is_force_killed(monkeypatch):
     ]
 
 
-def test_interrupted_guard_terminates_validation_process(monkeypatch):
+def test_interrupted_guard_terminates_validation_process(monkeypatch, tmp_path):
     validation_process = InterruptedValidationProcess()
     terminated_processes = []
     monkeypatch.setattr(
@@ -187,7 +188,7 @@ def test_interrupted_guard_terminates_validation_process(monkeypatch):
     with pytest.raises(KeyboardInterrupt):
         steward_defer_to_rebuild.run_validation_with_rebuild_preemption(
             ["validator"],
-            Path("/tmp/rebuild.lock.d"),
+            tmp_path / "rebuild.lock.d",
             1,
         )
 
