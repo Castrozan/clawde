@@ -118,7 +118,7 @@ def test_rebuild_starting_during_validation_preempts_and_restarts_it(monkeypatch
     monkeypatch.setattr(
         steward_defer_to_rebuild,
         "start_validation_process",
-        lambda command: next(validation_processes),
+        lambda command, validation_lock_descriptor: next(validation_processes),
     )
     monkeypatch.setattr(
         steward_defer_to_rebuild,
@@ -171,7 +171,7 @@ def test_interrupted_guard_terminates_validation_process(monkeypatch):
     monkeypatch.setattr(
         steward_defer_to_rebuild,
         "start_validation_process",
-        lambda command: validation_process,
+        lambda command, validation_lock_descriptor: validation_process,
     )
     monkeypatch.setattr(
         steward_defer_to_rebuild,

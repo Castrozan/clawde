@@ -1,4 +1,5 @@
 import argparse
+import fcntl
 import os
 import signal
 import shutil
@@ -63,11 +64,19 @@ def low_io_priority_command(command):
     ionice_binary = shutil.which("ionice")
     if ionice_binary:
         return [ionice_binary, "-c", "3", *command]
+    if sys.platform == "darwin":
+        taskpolicy_binary = shutil.which("taskpolicy")
+        if taskpolicy_binary:
+            return [taskpolicy_binary, "-b", *command]
     return command
 
 
-def start_validation_process(command):
-    return subprocess.Popen(low_io_priority_command(command), start_new_session=True)
+def start_validation_process(command, validation_lock_descriptor):
+    return subprocess.Popen(
+        low_io_priority_command(command),
+        start_new_session=True,
+        pass_fds=(validation_lock_descriptor,),
+    )
 
 
 def terminate_validation_process(validation_process):
@@ -93,9 +102,28 @@ def run_validation_with_rebuild_preemption(
     poll_interval_seconds,
 ):
     lower_cpu_priority()
+    validation_lock_path = lock_directory.with_suffix(".validation.lock")
+    with validation_lock_path.open("a") as validation_lock:
+        fcntl.flock(validation_lock, fcntl.LOCK_EX)
+        return run_locked_validation(
+            command,
+            lock_directory,
+            poll_interval_seconds,
+            validation_lock.fileno(),
+        )
+
+
+def run_locked_validation(
+    command,
+    lock_directory,
+    poll_interval_seconds,
+    validation_lock_descriptor,
+):
     while True:
         wait_until_rebuild_finishes(lock_directory, poll_interval_seconds)
-        validation_process = start_validation_process(command)
+        validation_process = start_validation_process(
+            command, validation_lock_descriptor
+        )
         validation_is_running = True
         try:
             while True:
