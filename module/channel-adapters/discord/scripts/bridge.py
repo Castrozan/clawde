@@ -5,6 +5,7 @@ import sys
 
 import discord
 from channel_access import load_access_document, message_is_for_this_agent
+from channel_message.inbound_context import prompt_with_discord_message_context
 from channel_turn_harness import (
     record_channel_turn_result,
     resolve_active_one_shot_turn_command,
@@ -85,7 +86,7 @@ class AgentBridgeClient(discord.Client):
                     one_shot_turn_command,
                     self.workspace_directory,
                     os.path.join(self.state_directory, "sessions", active_harness_name),
-                    prompt,
+                    prompt_with_discord_message_context(message, prompt),
                     self.daily_session_rotation,
                 )
                 record_channel_turn_result(
