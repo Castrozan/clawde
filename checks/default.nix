@@ -52,6 +52,11 @@ forAllSystems (
       inherit pkgs lib;
       module = self.homeManagerModules.clawde;
     };
+    claudeWorkspaceSettings =
+      discordTransportFixture.claudeAutoEvaluated.config.home.file."clawde/fixture-agent/.claude/settings.json";
+    claudeWorkspaceSettingsSource =
+      claudeWorkspaceSettings.source
+        or (pkgs.writeText "claude-workspace-settings.json" claudeWorkspaceSettings.text);
     checkAssertion =
       assertion:
       let
@@ -94,6 +99,22 @@ forAllSystems (
     discord-transport-eval = pkgs.runCommand "clawde-discord-transport-eval" { } (
       lib.concatStringsSep "\n" (map checkAssertion discordTransportFixture.assertions) + "\ntouch $out"
     );
+
+    claude-workspace-settings-parent =
+      pkgs.runCommand "clawde-claude-workspace-settings-parent"
+        {
+          nativeBuildInputs = [ pkgs.findutils ];
+          expectedSettings = claudeWorkspaceSettings.text;
+          passAsFile = [ "expectedSettings" ];
+        }
+        ''
+          settings_target="$(readlink -f "${claudeWorkspaceSettingsSource}")"
+          settings_directory="$(dirname "$settings_target")"
+          test "$settings_directory" != "${builtins.storeDir}"
+          test "$(find "$settings_directory" -mindepth 1 -maxdepth 1 | wc -l)" -eq 1
+          cmp "$settings_target" "$expectedSettingsPath"
+          touch "$out"
+        '';
 
     channel-turn-execution = import ../module/tests/channel-turn-execution/check.nix {
       inherit pkgs lib;

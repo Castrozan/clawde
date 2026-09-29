@@ -163,9 +163,13 @@ in
             permissions.deny = agent.denyToolPatterns;
           };
           settings = lib.recursiveUpdate denySettings channelWorkspaceSettings;
+          settingsText = builtins.toJSON settings;
         in
         lib.optionalAttrs (settings != { }) {
-          "${workspaceRelativeToHome}/.claude/settings.json".text = builtins.toJSON settings;
+          "${workspaceRelativeToHome}/.claude/settings.json" = {
+            text = settingsText;
+            source = "${pkgs.writeTextDir "settings.json" settingsText}/settings.json";
+          };
         };
 
       agentActivationScriptFor =
