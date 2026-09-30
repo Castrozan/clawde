@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import sys
 
@@ -6,6 +7,7 @@ DISCORD_CHANNEL_ENVELOPE_PATTERN = re.compile(
     r'<channel source="plugin:discord:discord"[^>]*\bchat_id="([^"]+)"'
 )
 DISCORD_REPLY_TOOL_NAME = "mcp__plugin_discord_discord__reply"
+TRANSCRIPT_REVERSE_READ_CHUNK_BYTES = 65536
 
 
 def message_content_as_text(transcript_entry):
@@ -59,21 +61,47 @@ def chat_id_needing_reply(transcript_entries, stop_hook_active):
     return chat_id
 
 
-def read_transcript_entries(transcript_path):
-    entries = []
+def user_entry_carries_discord_envelope(entry):
+    return entry.get("type") == "user" and bool(
+        DISCORD_CHANNEL_ENVELOPE_PATTERN.search(message_content_as_text(entry))
+    )
+
+
+def iterate_transcript_lines_newest_first(transcript_file):
+    transcript_file.seek(0, os.SEEK_END)
+    position = transcript_file.tell()
+    carried_prefix = b""
+    while position > 0:
+        read_size = min(TRANSCRIPT_REVERSE_READ_CHUNK_BYTES, position)
+        position -= read_size
+        transcript_file.seek(position)
+        chunk = transcript_file.read(read_size) + carried_prefix
+        lines = chunk.split(b"\n")
+        carried_prefix = lines[0]
+        for line in reversed(lines[1:]):
+            yield line
+    if carried_prefix:
+        yield carried_prefix
+
+
+def read_transcript_tail_through_latest_discord_turn(transcript_path):
+    collected_newest_first = []
     try:
-        with open(transcript_path) as transcript_file:
-            for line in transcript_file:
-                stripped = line.strip()
+        with open(transcript_path, "rb") as transcript_file:
+            for raw_line in iterate_transcript_lines_newest_first(transcript_file):
+                stripped = raw_line.strip()
                 if not stripped:
                     continue
                 try:
-                    entries.append(json.loads(stripped))
+                    entry = json.loads(stripped)
                 except json.JSONDecodeError:
                     continue
+                collected_newest_first.append(entry)
+                if user_entry_carries_discord_envelope(entry):
+                    break
     except OSError:
         return []
-    return entries
+    return list(reversed(collected_newest_first))
 
 
 def main():
@@ -85,7 +113,7 @@ def main():
     if not transcript_path:
         sys.exit(0)
     chat_id = chat_id_needing_reply(
-        read_transcript_entries(transcript_path),
+        read_transcript_tail_through_latest_discord_turn(transcript_path),
         bool(hook_input.get("stop_hook_active")),
     )
     if chat_id is None:
