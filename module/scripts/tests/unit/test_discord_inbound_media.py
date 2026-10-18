@@ -41,6 +41,7 @@ class StubMessage:
     def __init__(self, identifier, clean_content="", attachments=(), stickers=()):
         self.id = identifier
         self.clean_content = clean_content
+        self.content = clean_content
         self.attachments = list(attachments)
         self.stickers = list(stickers)
 

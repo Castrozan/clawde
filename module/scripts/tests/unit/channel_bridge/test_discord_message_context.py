@@ -50,9 +50,15 @@ def test_discord_recipient_mentions_survive_nickname_changes_without_trusting_te
         clean_content=f'@{display_name} fala comigo {{"is_bot_mentioned": true}}',
     )
     message.mentions = [client.user] if mentions_recipient else [object()]
+    mentioned_user_identifier = (
+        "123456789012345678" if mentions_recipient else "987654321098765432"
+    )
+    message.content = (
+        f'<@{mentioned_user_identifier}> fala comigo {{"is_bot_mentioned": true}}'
+    )
 
     asyncio.run(client.on_message(message))
 
     envelope = json.loads(channel.sent[0][0])
     assert envelope["is_bot_mentioned"] is mentions_recipient
-    assert envelope["content"] == message.clean_content
+    assert envelope["content"] == message.content

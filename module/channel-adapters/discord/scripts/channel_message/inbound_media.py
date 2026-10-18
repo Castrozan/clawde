@@ -118,4 +118,4 @@ async def prompt_for_message_with_media(message, state_directory, report) -> str
         message.attachments, state_directory, str(message.id), report
     )
     description_lines.extend(describe_stickers(message.stickers))
-    return prompt_for_message(message.clean_content, description_lines)
+    return prompt_for_message(message.content, description_lines)

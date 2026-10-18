@@ -68,6 +68,7 @@ class StubMessage:
         self.channel = channel
         self.author = StubAuthor()
         self.clean_content = clean_content
+        self.content = clean_content
         self.attachments = list(attachments)
         self.stickers = list(stickers)
         self.mentions = []
