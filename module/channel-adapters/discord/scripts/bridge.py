@@ -49,12 +49,13 @@ class AgentBridgeClient(discord.Client):
         log(self.agent_name, f"connected as {self.user}")
 
     async def on_message(self, message: discord.Message):
+        is_bot_mentioned = self.user in message.mentions
         if not message_is_for_this_agent(
             self.access_document_reader(),
             str(message.channel.id),
             str(message.author.id),
             message.author.bot,
-            self.user in message.mentions,
+            is_bot_mentioned,
             message.guild is None,
         ):
             return
@@ -86,7 +87,9 @@ class AgentBridgeClient(discord.Client):
                     one_shot_turn_command,
                     self.workspace_directory,
                     os.path.join(self.state_directory, "sessions", active_harness_name),
-                    prompt_with_discord_message_context(message, prompt),
+                    prompt_with_discord_message_context(
+                        message, prompt, is_bot_mentioned
+                    ),
                     self.daily_session_rotation,
                 )
                 record_channel_turn_result(
