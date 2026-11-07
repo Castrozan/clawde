@@ -42,7 +42,7 @@ let
         rotationFlag
       ];
     in
-    "${waitForTokenPrefix}${tokenAssignment}PYTHONPATH=${./scripts}:${../../scripts/harness} exec ${bridgePythonEnvironment}/bin/python3 ${bridgeArguments}";
+    "${waitForTokenPrefix}${tokenAssignment}PYTHONPATH=${./scripts}:${../../scripts/harness} exec ${bridgePythonEnvironment}/bin/python3 -P ${bridgeArguments}";
 in
 {
   inherit
