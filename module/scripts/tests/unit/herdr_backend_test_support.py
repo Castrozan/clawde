@@ -52,6 +52,7 @@ TAB_LIST_WP = (
     "]}}"
 )
 TAB_LIST_WP_ONLY_BOOTSTRAP = '{"result":{"tabs":[{"tab_id":"wP:t1","label":"1"}]}}'
+TAB_LIST_WP_ONLY_AGENT = '{"result":{"tabs":[{"tab_id":"wP:t7","label":"bronze"}]}}'
 PANE_LIST_JSON = '{"result":{"panes":[{"pane_id":"wP:p7","tab_id":"wP:t7"}]}}'
 TAB_CREATE_JSON = '{"result":{"root_pane":{"pane_id":"wZ:p9","tab_id":"wZ:t9"}}}'
 SERVER_RUNNING_JSON = '{"sessions":[{"default":true,"name":"default","running":true}]}'

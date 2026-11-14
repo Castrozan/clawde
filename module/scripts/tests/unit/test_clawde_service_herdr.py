@@ -7,6 +7,7 @@ from herdr_backend_test_support import (
     CompletedProcessStub,
     TAB_CREATE_JSON,
     TAB_LIST_WP,
+    TAB_LIST_WP_ONLY_AGENT,
     TAB_LIST_WP_ONLY_BOOTSTRAP,
     WORKSPACE_CREATE_CLAWDE,
     WORKSPACE_LIST_WITH_CLAWDE,
@@ -94,6 +95,44 @@ def test_create_agent_window_creates_the_workspace_when_missing():
     ) in issued
 
 
+def test_create_agent_window_drops_the_default_tab_of_a_workspace_it_created():
+    issued = []
+    backend = backend_with_responses(
+        issued,
+        [
+            (("workspace", "list"), WORKSPACE_LIST_WITHOUT_CLAWDE),
+            (("workspace", "create"), WORKSPACE_CREATE_CLAWDE),
+            (("tab", "create"), TAB_CREATE_JSON),
+            (("tab", "list", "--workspace", "wZ"), TAB_LIST_WP),
+        ],
+    )
+    assert backend.create_agent_window("clawde", "bronze", "exec /nix/store/x-agent")
+    creation = (
+        "tab",
+        "create",
+        "--workspace",
+        "wZ",
+        "--label",
+        "bronze",
+        "--no-focus",
+    )
+    assert issued.index(creation) < issued.index(("tab", "close", "wP:t1"))
+
+
+def test_create_agent_window_keeps_the_default_tab_of_a_workspace_it_found():
+    issued = []
+    backend = backend_with_responses(
+        issued,
+        [
+            (("workspace", "list"), WORKSPACE_LIST_WITH_CLAWDE),
+            (("tab", "create"), TAB_CREATE_JSON),
+            (("tab", "list", "--workspace"), TAB_LIST_WP),
+        ],
+    )
+    assert backend.create_agent_window("clawde", "bronze", "exec /nix/store/x-agent")
+    assert not any(command[:2] == ("tab", "close") for command in issued)
+
+
 def test_relaunch_starts_the_replacement_tab_before_discarding_the_stale_one():
     issued = []
     backend = backend_with_responses(
@@ -175,6 +214,37 @@ def test_remove_agent_window_closes_the_agent_tab():
     backend.remove_agent_window("clawde", "bronze")
 
     assert ("tab", "close", "wP:t7") in issued
+
+
+def test_remove_agent_window_closes_a_workspace_left_holding_only_the_agent():
+    issued = []
+    backend = backend_with_responses(
+        issued,
+        [
+            (("workspace", "list"), WORKSPACE_LIST_WITH_CLAWDE),
+            (("tab", "list", "--workspace"), TAB_LIST_WP_ONLY_AGENT),
+        ],
+    )
+
+    backend.remove_agent_window("clawde", "bronze")
+
+    assert ("workspace", "close", "wP") in issued
+    assert not any(command[:2] == ("tab", "close") for command in issued)
+
+
+def test_remove_agent_window_keeps_a_workspace_holding_other_tabs():
+    issued = []
+    backend = backend_with_responses(
+        issued,
+        [
+            (("workspace", "list"), WORKSPACE_LIST_WITH_CLAWDE),
+            (("tab", "list", "--workspace"), TAB_LIST_WP),
+        ],
+    )
+
+    backend.remove_agent_window("clawde", "bronze")
+
+    assert not any(command[:2] == ("workspace", "close") for command in issued)
 
 
 def test_remove_agent_window_is_a_noop_when_the_tab_is_absent():

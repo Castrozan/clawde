@@ -61,6 +61,7 @@ class HerdrSupervisorBackend(HerdrQueryOperations, SupervisorMultiplexerBackend)
     def create_agent_window(
         self, session_name: str, agent_name: str, wrapper_command: str
     ) -> bool:
+        workspace_was_absent = self.find_workspace_id_for_label(session_name) is None
         workspace_id = self.ensure_workspace(session_name)
         if workspace_id is None:
             return False
@@ -83,6 +84,8 @@ class HerdrSupervisorBackend(HerdrQueryOperations, SupervisorMultiplexerBackend)
         created = self.parse_herdr_json(create_result.stdout)
         if created is None:
             return False
+        if workspace_was_absent:
+            self.close_default_tab_beside_other_tabs(workspace_id)
         pane_id = created.get("result", {}).get("root_pane", {}).get("pane_id")
         if not pane_id:
             return False
@@ -113,20 +116,14 @@ class HerdrSupervisorBackend(HerdrQueryOperations, SupervisorMultiplexerBackend)
         return True
 
     def ensure_host_ready(self, session_name: str) -> bool:
-        if not self.ensure_server_running():
-            return False
-        if self.find_workspace_id_for_label(session_name) is not None:
-            return False
-        return self.create_workspace(session_name) is not None
+        self.ensure_server_running()
+        return False
 
-    def remove_bootstrap_scaffolding(self, session_name: str) -> None:
-        workspace_id = self.find_workspace_id_for_label(session_name)
-        if workspace_id is None:
-            return
+    def close_default_tab_beside_other_tabs(self, workspace_id: str) -> None:
         tabs = self.list_workspace_tabs(workspace_id)
         if tabs is None or len(tabs) <= 1:
             return
-        bootstrap_tab = next(
+        default_tab = next(
             (
                 tab
                 for tab in tabs
@@ -134,12 +131,27 @@ class HerdrSupervisorBackend(HerdrQueryOperations, SupervisorMultiplexerBackend)
             ),
             None,
         )
-        if bootstrap_tab is None:
+        if default_tab is None:
             return
-        self.run_herdr_command("tab", "close", bootstrap_tab["tab_id"])
+        self.run_herdr_command("tab", "close", default_tab["tab_id"])
+
+    def remove_bootstrap_scaffolding(self, session_name: str) -> None:
+        workspace_id = self.find_workspace_id_for_label(session_name)
+        if workspace_id is None:
+            return
+        self.close_default_tab_beside_other_tabs(workspace_id)
 
     def remove_agent_window(self, session_name: str, agent_name: str) -> None:
-        tab = self.find_agent_tab(session_name, agent_name)
-        if tab is None:
+        workspace_id = self.find_workspace_id_for_label(session_name)
+        if workspace_id is None:
             return
-        self.run_herdr_command("tab", "close", tab["tab_id"])
+        tabs = self.list_workspace_tabs(workspace_id)
+        if tabs is None:
+            return
+        agent_tab = next((tab for tab in tabs if tab.get("label") == agent_name), None)
+        if agent_tab is None:
+            return
+        if len(tabs) == 1:
+            self.run_herdr_command("workspace", "close", workspace_id)
+            return
+        self.run_herdr_command("tab", "close", agent_tab["tab_id"])

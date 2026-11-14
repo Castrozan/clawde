@@ -50,7 +50,7 @@ def test_ensure_workspace_creates_when_absent():
     ) in issued
 
 
-def test_ensure_host_ready_creates_the_workspace_and_reports_scaffolding():
+def test_ensure_host_ready_leaves_a_dormant_session_without_a_workspace():
     issued = []
     backend = backend_with_responses(
         issued,
@@ -58,25 +58,6 @@ def test_ensure_host_ready_creates_the_workspace_and_reports_scaffolding():
             (("session", "list", "--json"), SERVER_RUNNING_JSON),
             (("workspace", "list"), WORKSPACE_LIST_WITHOUT_CLAWDE),
             (("workspace", "create"), WORKSPACE_CREATE_CLAWDE),
-        ],
-    )
-    assert backend.ensure_host_ready("clawde") is True
-    assert (
-        "workspace",
-        "create",
-        "--label",
-        "clawde",
-        "--no-focus",
-    ) in issued
-
-
-def test_ensure_host_ready_is_a_noop_when_workspace_already_present():
-    issued = []
-    backend = backend_with_responses(
-        issued,
-        [
-            (("session", "list", "--json"), SERVER_RUNNING_JSON),
-            (("workspace", "list"), WORKSPACE_LIST_WITH_CLAWDE),
         ],
     )
     assert backend.ensure_host_ready("clawde") is False
